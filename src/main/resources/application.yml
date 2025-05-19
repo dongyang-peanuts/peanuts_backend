@@ -1,0 +1,23 @@
+#DB 연동
+spring:
+  datasource:
+    driver-class-name: org.mariadb.jdbc.Driver
+    url: jdbc:mariadb://127.0.0.1:33306/ddang_kong
+    username: admin
+    password: kongadmin2025
+
+  jpa:
+    hibernate:
+      ddl-auto: none
+      naming:
+        physical-strategy: org.hibernate.boot.model.naming.PhysicalNamingStrategyStandardImpl
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.MySQLDialect
+
+ssh:
+  host: kongback.kro.kr
+  ssh_port: 22
+  user: ubuntu
+  private_key: src/main/resources/dbssh/DDANG_KONG-KEY.ppk
+  database_port: 3307
