@@ -35,4 +35,9 @@ out/
 
 ### VS Code ###
 .vscode/
+
+### SSH ###
 *.ppk
+*.pem
+/src/main/resources/dbssh/
+
