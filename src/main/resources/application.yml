@@ -3,8 +3,8 @@ spring:
   datasource:
     driver-class-name: org.mariadb.jdbc.Driver
     url: jdbc:mariadb://localhost:44000/ddang_kong
-    username: ${username}
-    password: ${password}
+    username: admin
+    password: kongadmin2025
 
   jpa:
     hibernate:
@@ -18,8 +18,8 @@ spring:
 
 
 ssh:
-  host: ${url}
+  host: kongback.kro.kr
   sshPort: 22
-  user: ${user}
-  privatekey: ${privatekey}
+  user: ubuntu
+  privatekey: src/main/resources/dbssh/DDANG_KONG-KEY.pem
   database_port: 3307
