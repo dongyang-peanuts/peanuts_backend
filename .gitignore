@@ -39,5 +39,6 @@ out/
 ### SSH ###
 *.ppk
 *.pem
-/src/main/resources/dbssh/
+*.env
+src/main/resources/dbssh/
 
