@@ -1,12 +1,15 @@
 package com.kong.backend.service;
 
 import com.kong.backend.DTO.UserDto;
+import com.kong.backend.Entity.LoginEntity;
 import com.kong.backend.Entity.UserEntity;
+import com.kong.backend.repository.LoginRepository;
 import com.kong.backend.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDateTime;
 import java.util.Optional;
 
 @Service
@@ -14,6 +17,7 @@ import java.util.Optional;
 public class UserService {
 
     private final UserRepository userRepository;
+    private final LoginRepository loginRepository;
     private final BCryptPasswordEncoder passwordEncoder;
 
     public UserEntity signup(UserDto dto) {
@@ -44,7 +48,14 @@ public class UserService {
             throw new IllegalArgumentException("비밀번호가 틀렸습니다.");
         }
         if (userOpt.isEmpty()) return false;
+        LoginEntity loginRecord = LoginEntity.builder()
+                .userEmail(email)
+                .loginTime(LocalDateTime.now())
+                .Auth(0) // 일반 사용자
+                .build();
 
-        return passwordEncoder.matches(rawPwd, userOpt.get().getUserPwd());
+        loginRepository.save(loginRecord);
+
+        return true;
     }
 }

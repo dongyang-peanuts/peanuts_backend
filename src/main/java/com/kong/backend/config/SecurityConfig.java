@@ -19,8 +19,8 @@ public class SecurityConfig {
                                 new AntPathRequestMatcher("/swagger-ui/**"),
                                 new AntPathRequestMatcher("/v3/api-docs/**"),
                                 new AntPathRequestMatcher("/user/signup"),
-                                new AntPathRequestMatcher("/user/login"),
-                                new AntPathRequestMatcher("/user/logout")
+                                new AntPathRequestMatcher("/user/**"),
+                                new AntPathRequestMatcher("/admin/**")
                         ).permitAll()
                         .anyRequest().authenticated()
                 )
