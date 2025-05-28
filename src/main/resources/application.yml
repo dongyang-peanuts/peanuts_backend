@@ -16,10 +16,13 @@ spring:
         dialect: org.hibernate.dialect.MySQLDialect
         format_sql: true
 
-
 ssh:
   host: kongback.kro.kr
   sshPort: 22
   user: ubuntu
   privatekey: src/main/resources/dbssh/DDANG_KONG-KEY.pem
   database_port: 3307
+
+
+server:
+  port: 80
