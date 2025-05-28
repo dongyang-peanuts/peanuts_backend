@@ -9,6 +9,14 @@ DEPLOY_LOG="$PROJECT_ROOT/deploy.log"
 
 TIME_NOW=$(date +%c)
 
+# 기존 프로세스 종료
+CURRENT_PID=$(pgrep -f $JAR_FILE)
+if [ -n "$CURRENT_PID" ]; then
+  echo "$TIME_NOW > Kill running process: $CURRENT_PID" >> $DEPLOY_LOG
+  kill -15 "$CURRENT_PID"
+  sleep 3
+fi
+
 # build 파일 복사
 echo "$TIME_NOW > $JAR_FILE 파일 복사" >> $DEPLOY_LOG
 cp $PROJECT_ROOT/build/libs/*.jar $JAR_FILE
