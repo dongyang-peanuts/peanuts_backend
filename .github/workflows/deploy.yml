@@ -34,17 +34,23 @@ jobs:
         distribution: 'temurin'
         java-version: '17'
 
-    # (3) gradlew 실행 권한 부여
+    # (3) 실행 권한 부여
+    - name: Set permissions for start.sh and stop.sh
+      run: |
+        chmod +x scripts/start.sh
+        chmod +x scripts/stop.sh
+
+    # (4) gradlew 실행 권한 부여
     - name: Grant execute permission to gradlew
       run: chmod +x ./gradlew
 
-    # (4) Gradle 빌드 (테스트 제외)
+    # (5) Gradle 빌드 (테스트 제외)
     - name: Build with Gradle
       uses: gradle/gradle-build-action@v2
       with:
         arguments: clean build -x test
 
-    # (5) AWS 인증 정보 설정
+    # (6) AWS 인증 정보 설정
     - name: Configure AWS credentials
       uses: aws-actions/configure-aws-credentials@v1
       with:
@@ -52,7 +58,7 @@ jobs:
         aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         aws-region: ${{ env.AWS_REGION }}
 
-    # (6) S3에 배포 ZIP 업로드
+    # (7) S3에 배포 ZIP 업로드
     - name: Upload to AWS S3
       run: |
         zip -r $GITHUB_SHA.zip . -x "*.git*" -x "*.github*" -x "node_modules/*"
@@ -62,7 +68,7 @@ jobs:
           --s3-location s3://$S3_BUCKET_NAME/$GITHUB_SHA.zip \
           --source .
 
-    # (7) CodeDeploy로 EC2 배포 시작
+    # (8) CodeDeploy로 EC2 배포 시작
     - name: Deploy to AWS EC2 from S3
       run: |
         aws deploy create-deployment \
