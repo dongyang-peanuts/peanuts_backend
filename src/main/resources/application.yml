@@ -2,7 +2,7 @@
 spring:
   datasource:
     driver-class-name: org.mariadb.jdbc.Driver
-    url: jdbc:mariadb://localhost:3306/ddang_kong
+    url: jdbc:mariadb://localhost:44000/ddang_kong
     username: admin
     password: kongadmin2025
 
