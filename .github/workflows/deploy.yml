@@ -55,6 +55,7 @@ jobs:
     # (6) S3에 배포 ZIP 업로드
     - name: Upload to AWS S3
       run: |
+        cd app
         zip -r $GITHUB_SHA.zip . -x "*.git*" -x "*.github*" -x "node_modules/*"
         aws deploy push \
           --application-name ${{ env.CODE_DEPLOY_APPLICATION_NAME }} \
