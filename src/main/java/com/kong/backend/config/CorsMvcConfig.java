@@ -11,8 +11,8 @@ public class CorsMvcConfig implements WebMvcConfigurer {
     public void addCorsMappings(CorsRegistry corsRegistry) {
 
         corsRegistry.addMapping("/**")
-                .allowedOrigins("http://localhost:3000","http://kongback.kro.kr:8080"
-                        ,"https://localhost:8080", "http://localhost","http://localhost:5174")
+                .allowedOrigins("http://localhost:3000", "http://kongback.kro.kr:8080"
+                        ,"https://localhost:8080", "http://localhost", "http://localhost:5174")
                 .allowedMethods("GET", "POST", "PUT", "DELETE")
                 .allowedHeaders("*")
                 .allowCredentials(true)

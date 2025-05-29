@@ -33,6 +33,7 @@ public class UserService {
         user.setUserAddr(dto.getUserAddr());
         user.setUserNumber(dto.getUserNumber());
         user.setProNum(dto.getProNum());
+        user.setAuth(0);
 
         return userRepository.save(user);
     }

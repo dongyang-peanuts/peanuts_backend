@@ -1,9 +1,10 @@
 package com.kong.backend.service;
 
+import com.kong.backend.DTO.AdminDto;
 import com.kong.backend.Entity.AdminEntity;
-import com.kong.backend.Entity.LoginEntity;
+import com.kong.backend.Entity.AdminLoginEntity;
+import com.kong.backend.repository.AdminLoginRepository;
 import com.kong.backend.repository.AdminRepository;
-import com.kong.backend.repository.LoginRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -15,7 +16,7 @@ import java.time.LocalDateTime;
 public class AdminService {
 
     private final AdminRepository adminRepository;
-    private final LoginRepository loginRepository;
+    private final AdminLoginRepository adminloginRepository;
     private final BCryptPasswordEncoder passwordEncoder;
 
     public boolean login(String adminId, String rawPwd) {
@@ -27,14 +28,28 @@ public class AdminService {
         }
 
         // 로그인 성공 시 login 테이블에 기록
-        LoginEntity login = LoginEntity.builder()
-                .userEmail(adminId)
-                .loginTime(LocalDateTime.now())
+        AdminLoginEntity Login = AdminLoginEntity.builder()
+                .adminId(adminId)
+                .adminloginTime(LocalDateTime.now())
                 .Auth(1)
                 .build();
 
-        loginRepository.save(login);
+        adminloginRepository.save(Login);
 
         return true;
+    }
+
+    public void signup(AdminDto dto) {
+        if (adminRepository.findByAdminId(dto.getAdminId()).isPresent()) {
+            throw new IllegalArgumentException("이미 존재하는 관리자 ID입니다.");
+        }
+
+        AdminEntity admin = AdminEntity.builder()
+                .adminId(dto.getAdminId())
+                .adminPwd(passwordEncoder.encode(dto.getAdminPwd()))
+                .Auth(1)
+                .build();
+
+        adminRepository.save(admin);
     }
 }

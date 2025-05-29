@@ -26,4 +26,7 @@ public class UserEntity {
 
     @Column(length = 100)
     private String proNum;
+
+    @Column(nullable = false)
+    private Integer Auth; // 0: 일반 사용자, 1: 관리자
 }

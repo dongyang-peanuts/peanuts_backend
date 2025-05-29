@@ -6,23 +6,23 @@ import lombok.*;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "login")
+@Table(name = "adminlogin")
 @Getter
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class LoginEntity {
+public class AdminLoginEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Integer loginKey;
+    private Integer adminloginKey;
 
     @Column(nullable = false)
-    private String userEmail;
+    private String adminId;
 
     @Column(nullable = false)
-    private LocalDateTime loginTime;
+    private LocalDateTime adminloginTime;
 
     @Column(nullable = false)
     private Integer Auth; // 0: 일반 사용자, 1: 관리자
