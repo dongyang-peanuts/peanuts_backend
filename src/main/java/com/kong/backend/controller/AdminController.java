@@ -2,12 +2,11 @@ package com.kong.backend.controller;
 
 import com.kong.backend.DTO.AdminDto;
 import com.kong.backend.DTO.AdminLoginRequestDto;
-import com.kong.backend.Entity.AdminEntity;
 import com.kong.backend.Entity.AdminLoginEntity;
 import com.kong.backend.repository.AdminLoginRepository;
-import com.kong.backend.repository.AdminRepository;
 import com.kong.backend.service.AdminService;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpSession;
 import lombok.RequiredArgsConstructor;
@@ -24,36 +23,36 @@ public class AdminController {
 
     private final AdminService adminService;
     private final AdminLoginRepository adminLoginRepository;
-    private final AdminRepository adminRepository;
 
-    @Operation(summary = "관리자 회원가입")
+    // ✅ 관리자 회원가입
+    @Operation(summary = "관리자 회원가입", responses = {
+            @ApiResponse(responseCode = "200", description = "회원가입 성공"),
+            @ApiResponse(responseCode = "400", description = "중복된 ID")
+    })
     @PostMapping("/signup")
     public ResponseEntity<String> signup(@RequestBody AdminDto dto) {
-        try {
-            adminService.signup(dto);
-            return ResponseEntity.ok("관리자 회원가입 성공");
-        } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body(e.getMessage());
-        }
+        adminService.signup(dto);
+        return ResponseEntity.ok("관리자 회원가입 성공");
     }
 
-    @Operation(summary = "관리자 로그인")
+    // ✅ 관리자 로그인
+    @Operation(summary = "관리자 로그인", responses = {
+            @ApiResponse(responseCode = "200", description = "로그인 성공"),
+            @ApiResponse(responseCode = "401", description = "비밀번호 틀림"),
+            @ApiResponse(responseCode = "404", description = "ID 없음")
+    })
     @PostMapping("/login")
     public ResponseEntity<String> login(@RequestBody AdminLoginRequestDto dto, HttpSession session) {
-        try {
-            boolean success = adminService.login(dto.getAdminId(), dto.getAdminPwd());
-            if (success) {
-                session.setAttribute("admin", dto.getAdminId());
-                return ResponseEntity.ok("관리자 로그인 성공");
-            }
-        } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body(e.getMessage());
-        }
-
-        return ResponseEntity.badRequest().body("로그인 실패");
+        adminService.login(dto.getAdminId(), dto.getAdminPwd());
+        session.setAttribute("admin", dto.getAdminId());
+        return ResponseEntity.ok("관리자 로그인 성공");
     }
 
-    @Operation(summary = "관리자 로그아웃")
+    // ✅ 관리자 로그아웃
+    @Operation(summary = "관리자 로그아웃", responses = {
+            @ApiResponse(responseCode = "200", description = "로그아웃 성공"),
+            @ApiResponse(responseCode = "404", description = "로그인 기록 없음")
+    })
     @PostMapping("/logout/{adminId}")
     public ResponseEntity<String> logout(@PathVariable String adminId) {
         Optional<AdminLoginEntity> login = adminLoginRepository.findTopByAdminIdOrderByAdminloginTimeDesc(adminId);

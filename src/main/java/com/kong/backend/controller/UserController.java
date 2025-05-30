@@ -4,6 +4,7 @@ import com.kong.backend.DTO.LoginRequestDto;
 import com.kong.backend.Entity.LoginEntity;
 import com.kong.backend.repository.LoginRepository;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import com.kong.backend.DTO.UserDto;
 import com.kong.backend.service.UserService;
@@ -24,38 +25,37 @@ public class UserController {
     private final UserService userService;
     private final LoginRepository loginRepository;
 
-    @Operation(summary = "회원가입", description = "이메일 중복 체크 포함")
+    // ✅ 유저 회원가입
+    @Operation(summary = "회원가입", responses = {
+            @ApiResponse(responseCode = "200", description = "회원가입 성공"),
+            @ApiResponse(responseCode = "400", description = "중복된 이메일")
+    })
     @PostMapping("/signup")
     public ResponseEntity<String> signup(@RequestBody UserDto dto) {
-        try {
-            userService.signup(dto);
-            return ResponseEntity.ok("회원가입 성공");
-        } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body(e.getMessage());
-        }
+        userService.signup(dto);
+        return ResponseEntity.ok("회원가입 성공");
     }
 
-    @Operation(summary = "로그인", description = "비밀번호 검증 포함")
+    // ✅ 유저 로그인
+    @Operation(summary = "로그인", responses = {
+            @ApiResponse(responseCode = "200", description = "로그인 성공"),
+            @ApiResponse(responseCode = "401", description = "비밀번호 틀림"),
+            @ApiResponse(responseCode = "404", description = "이메일 없음")
+    })
     @PostMapping("/login")
     public ResponseEntity<String> login(@RequestBody LoginRequestDto dto, HttpSession session) {
-        try {
-            boolean success = userService.login(dto.getUserEmail(), dto.getUserPwd());
-            if (success) {
-                session.setAttribute("user", dto.getUserEmail());
-                return ResponseEntity.ok("로그인 성공");
-            }
-        } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body(e.getMessage());
-        }
-
-        return ResponseEntity.badRequest().body("로그인 실패");
+        userService.login(dto.getUserEmail(), dto.getUserPwd());
+        session.setAttribute("user", dto.getUserEmail());
+        return ResponseEntity.ok("로그인 성공");
     }
 
-    @Operation(summary = "로그아웃", description = "세션 종료 처리")
+    // ✅ 유저 로그아웃
+    @Operation(summary = "로그아웃", responses = {
+            @ApiResponse(responseCode = "200", description = "로그아웃 성공"),
+            @ApiResponse(responseCode = "404", description = "로그인 기록 없음")
+    })
     @PostMapping("/logout/{userEmail}")
     public ResponseEntity<String> logout(@PathVariable String userEmail) {
-
-        // login 테이블에서 최근 로그인 기록 조회
         Optional<LoginEntity> login = loginRepository.findTopByUserEmailOrderByLoginTimeDesc(userEmail);
 
         if (login.isEmpty()) {
