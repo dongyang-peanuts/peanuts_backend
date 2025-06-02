@@ -3,6 +3,8 @@ package com.kong.backend.Entity;
 import jakarta.persistence.*;
 import lombok.*;
 
+import java.util.List;
+
 @Entity
 @Table(name = "user")
 @Getter @Setter @NoArgsConstructor @AllArgsConstructor
@@ -29,4 +31,9 @@ public class UserEntity {
 
     @Column(nullable = false)
     private Integer Auth; // 0: 일반 사용자, 1: 관리자
+
+    // 유저와 환자 연관관계
+    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<PatientEntity> patients;
+
 }

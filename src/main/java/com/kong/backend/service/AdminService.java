@@ -1,16 +1,22 @@
 package com.kong.backend.service;
 
 import com.kong.backend.DTO.AdminDto;
-import com.kong.backend.Entity.AdminEntity;
-import com.kong.backend.Entity.AdminLoginEntity;
+import com.kong.backend.DTO.PatientDto;
+import com.kong.backend.DTO.PatientInfoDto;
+import com.kong.backend.DTO.UserDto;
+import com.kong.backend.Entity.*;
 import com.kong.backend.exception.AdminNotFoundException;
 import com.kong.backend.exception.PasswordMismatchException;
+import com.kong.backend.exception.UserNotFoundException;
 import com.kong.backend.repository.AdminLoginRepository;
 import com.kong.backend.repository.AdminRepository;
+import com.kong.backend.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.time.LocalDateTime;
 
 @Service
@@ -20,6 +26,7 @@ public class AdminService {
     private final AdminRepository adminRepository;
     private final AdminLoginRepository adminLoginRepository;
     private final BCryptPasswordEncoder passwordEncoder;
+    private final UserRepository userRepository;
 
     /**
      * 로그인 시도 - 성공 시 로그인 로그 저장
@@ -61,5 +68,97 @@ public class AdminService {
                 .build();
 
         adminRepository.save(admin);
+    }
+
+    // 사용자 정보조회
+    public List<UserEntity> getAllUsers() {
+        return userRepository.findAll();
+    }
+
+    public List<UserDto> getAllUsersWithDetails() {
+        List<UserEntity> users = userRepository.findAll();
+        List<UserDto> userDtos = new ArrayList<>();
+
+        for (UserEntity user : users) {
+            UserDto userDto = new UserDto();
+            userDto.setUserEmail(user.getUserEmail());
+            userDto.setUserPwd(null); // 비밀번호는 보이지 않도록
+            userDto.setUserAddr(user.getUserAddr());
+            userDto.setUserNumber(user.getUserNumber());
+            userDto.setProNum(user.getProNum());
+
+            List<PatientDto> patientDtos = new ArrayList<>();
+            for (PatientEntity patient : user.getPatients()) {
+                PatientDto patientDto = new PatientDto();
+                patientDto.setPaName(patient.getPaName());
+                patientDto.setPaAddr(patient.getPaAddr());
+                patientDto.setPaAge(patient.getPaAge());
+                patientDto.setPaHei(patient.getPaHei());
+                patientDto.setPaWei(patient.getPaWei());
+
+                List<PatientInfoDto> infoDtos = new ArrayList<>();
+                for (PatientInfoEntity info : patient.getInfos()) {
+                    PatientInfoDto infoDto = new PatientInfoDto();
+                    infoDto.setPaFact(info.getPaFact());
+                    infoDto.setPaPrct(info.getPaPrct());
+                    infoDto.setPaDi(info.getPaDi());
+                    infoDto.setPaDise(info.getPaDise());
+                    infoDto.setPaExti(info.getPaExti());
+                    infoDto.setPaBest(info.getPaBest());
+                    infoDto.setPaMedi(info.getPaMedi());
+                    infoDtos.add(infoDto);
+                }
+
+                patientDto.setInfos(infoDtos);
+                patientDtos.add(patientDto);
+            }
+
+            userDto.setPatients(patientDtos);
+            userDtos.add(userDto);
+        }
+
+        return userDtos;
+    }
+
+    // 사용자 정보 상세조회
+    public UserDto getUserDetails(Integer userKey) {
+        UserEntity user = userRepository.findById(userKey)
+                .orElseThrow(() -> new UserNotFoundException("사용자를 찾을 수 없습니다."));
+
+        UserDto userDto = new UserDto();
+        userDto.setUserEmail(user.getUserEmail());
+        userDto.setUserPwd(null); // 보안상 비밀번호는 반환 X
+        userDto.setUserAddr(user.getUserAddr());
+        userDto.setUserNumber(user.getUserNumber());
+        userDto.setProNum(user.getProNum());
+
+        List<PatientDto> patientDtos = new ArrayList<>();
+        for (PatientEntity patient : user.getPatients()) {
+            PatientDto patientDto = new PatientDto();
+            patientDto.setPaName(patient.getPaName());
+            patientDto.setPaAddr(patient.getPaAddr());
+            patientDto.setPaAge(patient.getPaAge());
+            patientDto.setPaHei(patient.getPaHei());
+            patientDto.setPaWei(patient.getPaWei());
+
+            List<PatientInfoDto> infoDtos = new ArrayList<>();
+            for (PatientInfoEntity info : patient.getInfos()) {
+                PatientInfoDto infoDto = new PatientInfoDto();
+                infoDto.setPaFact(info.getPaFact());
+                infoDto.setPaPrct(info.getPaPrct());
+                infoDto.setPaDi(info.getPaDi());
+                infoDto.setPaDise(info.getPaDise());
+                infoDto.setPaExti(info.getPaExti());
+                infoDto.setPaBest(info.getPaBest());
+                infoDto.setPaMedi(info.getPaMedi());
+                infoDtos.add(infoDto);
+            }
+
+            patientDto.setInfos(infoDtos);
+            patientDtos.add(patientDto);
+        }
+
+        userDto.setPatients(patientDtos);
+        return userDto;
     }
 }

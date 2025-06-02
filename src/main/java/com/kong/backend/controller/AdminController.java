@@ -2,7 +2,9 @@ package com.kong.backend.controller;
 
 import com.kong.backend.DTO.AdminDto;
 import com.kong.backend.DTO.AdminLoginRequestDto;
+import com.kong.backend.DTO.UserDto;
 import com.kong.backend.Entity.AdminLoginEntity;
+import com.kong.backend.Entity.UserEntity;
 import com.kong.backend.repository.AdminLoginRepository;
 import com.kong.backend.service.AdminService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -13,6 +15,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
 import java.util.Optional;
 
 @Tag(name = "관리자 API", description = "회원정보관리, 모니터링 API")
@@ -33,6 +36,22 @@ public class AdminController {
     public ResponseEntity<String> signup(@RequestBody AdminDto dto) {
         adminService.signup(dto);
         return ResponseEntity.ok("관리자 회원가입 성공");
+    }
+
+    // ✅ 사용자 정보조회
+    @Operation(summary = "전체 회원 목록 조회", description = "모든 사용자 정보를 조회")
+    @GetMapping("/users")
+    public ResponseEntity<List<UserDto>> getAllUsers() {
+        List<UserDto> users = adminService.getAllUsersWithDetails();
+        return ResponseEntity.ok(users);
+    }
+
+    // ✅ 사용자정보 상세조회
+    @Operation(summary = "회원 상세 조회", description = "userKey로 회원 + 환자 + 환자정보 전체 조회")
+    @GetMapping("/users/{userKey}")
+    public ResponseEntity<UserDto> getUserDetails(@PathVariable Integer userKey) {
+        UserDto userDto = adminService.getUserDetails(userKey);
+        return ResponseEntity.ok(userDto);
     }
 
     // ✅ 관리자 로그인

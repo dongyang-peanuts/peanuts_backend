@@ -3,6 +3,8 @@ package com.kong.backend.DTO;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 
+import java.util.List;
+
 @Data
 public class UserDto {
 
@@ -21,4 +23,7 @@ public class UserDto {
 
     @Schema(description = "기기번호 번호", example = "PROMO01")
     private String proNum;
+
+    @Schema(description = "등록할 환자 목록")
+    private List<PatientDto> patients;
 }
