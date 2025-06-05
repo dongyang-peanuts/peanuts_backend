@@ -81,39 +81,13 @@ public class AdminService {
 
         for (UserEntity user : users) {
             UserDto userDto = new UserDto();
+            userDto.setUserKey(user.getUserKey());
             userDto.setUserEmail(user.getUserEmail());
-            userDto.setUserPwd(null); // 비밀번호는 보이지 않도록
             userDto.setUserAddr(user.getUserAddr());
             userDto.setUserNumber(user.getUserNumber());
+            userDto.setSignupDate(user.getSignupDate());
             userDto.setProNum(user.getProNum());
 
-            List<PatientDto> patientDtos = new ArrayList<>();
-            for (PatientEntity patient : user.getPatients()) {
-                PatientDto patientDto = new PatientDto();
-                patientDto.setPaName(patient.getPaName());
-                patientDto.setPaAddr(patient.getPaAddr());
-                patientDto.setPaAge(patient.getPaAge());
-                patientDto.setPaHei(patient.getPaHei());
-                patientDto.setPaWei(patient.getPaWei());
-
-                List<PatientInfoDto> infoDtos = new ArrayList<>();
-                for (PatientInfoEntity info : patient.getInfos()) {
-                    PatientInfoDto infoDto = new PatientInfoDto();
-                    infoDto.setPaFact(info.getPaFact());
-                    infoDto.setPaPrct(info.getPaPrct());
-                    infoDto.setPaDi(info.getPaDi());
-                    infoDto.setPaDise(info.getPaDise());
-                    infoDto.setPaExti(info.getPaExti());
-                    infoDto.setPaBest(info.getPaBest());
-                    infoDto.setPaMedi(info.getPaMedi());
-                    infoDtos.add(infoDto);
-                }
-
-                patientDto.setInfos(infoDtos);
-                patientDtos.add(patientDto);
-            }
-
-            userDto.setPatients(patientDtos);
             userDtos.add(userDto);
         }
 
@@ -126,6 +100,7 @@ public class AdminService {
                 .orElseThrow(() -> new UserNotFoundException("사용자를 찾을 수 없습니다."));
 
         UserDto userDto = new UserDto();
+        userDto.setUserKey(user.getUserKey());
         userDto.setUserEmail(user.getUserEmail());
         userDto.setUserPwd(null); // 보안상 비밀번호는 반환 X
         userDto.setUserAddr(user.getUserAddr());

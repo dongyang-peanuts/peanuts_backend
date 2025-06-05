@@ -32,7 +32,7 @@ public class UserController {
             @ApiResponse(responseCode = "400", description = "중복된 이메일")
     })
     @PostMapping("/signup")
-    public ResponseEntity<String> signup(@RequestBody UserDto dto) {
+    public ResponseEntity<String> signup(@RequestBody UserSignUpDto dto) {
         userService.signup(dto);
         return ResponseEntity.ok("회원가입 성공");
     }

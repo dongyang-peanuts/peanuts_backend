@@ -7,10 +7,7 @@ import java.time.LocalDate;
 import java.util.List;
 
 @Data
-public class UserDto {
-
-    @Schema(description = "사용자 고유키", example = "")
-    private Integer userKey;
+public class UserSignUpDto {
 
     @Schema(description = "이메일", example = "test@example.com")
     private String userEmail;
@@ -23,12 +20,6 @@ public class UserDto {
 
     @Schema(description = "전화번호", example = "01012345678")
     private String userNumber;
-
-    @Schema(description = "기기번호 번호", example = "PROMO01")
-    private String proNum;
-
-    @Schema(description = "가입일", example = "2025-06-05")
-    private LocalDate signupDate;
 
     @Schema(description = "등록할 환자 목록")
     private List<PatientDto> patients;

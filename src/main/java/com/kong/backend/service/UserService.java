@@ -17,6 +17,7 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -33,7 +34,7 @@ public class UserService {
     private final PatientInfoRepository patientInfoRepository;
 
 
-    public UserEntity signup(UserDto dto) {
+    public UserEntity signup(UserSignUpDto dto) {
         // 이메일 중복 체크
         if (userRepository.findByUserEmail(dto.getUserEmail()).isPresent()) {
             throw new IllegalArgumentException("이미 존재하는 이메일입니다.");
@@ -45,8 +46,8 @@ public class UserService {
         user.setUserPwd(passwordEncoder.encode(dto.getUserPwd()));
         user.setUserAddr(dto.getUserAddr());
         user.setUserNumber(dto.getUserNumber());
-        user.setProNum(dto.getProNum());
         user.setAuth(0); // 일반 사용자
+        user.setSignupDate(LocalDate.now());
         user = userRepository.save(user);
 
         // 환자 저장
