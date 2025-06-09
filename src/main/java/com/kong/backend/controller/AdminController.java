@@ -83,4 +83,15 @@ public class AdminController {
         adminLoginRepository.delete(login.get());
         return ResponseEntity.ok("관리자 로그아웃 성공");
     }
+
+    // ✅ 사용자 정보 삭제
+    @Operation(summary = "사용자 삭제", responses = {
+                    @ApiResponse(responseCode = "200", description = "삭제 성공"),
+                    @ApiResponse(responseCode = "404", description = "사용자 없음")
+    })
+    @DeleteMapping("/users/{userKey}")
+    public ResponseEntity<String> deleteUser(@PathVariable Integer userKey) {
+        adminService.deleteUserByKey(userKey);
+        return ResponseEntity.ok("사용자 삭제 완료");
+    }
 }

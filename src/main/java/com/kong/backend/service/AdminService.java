@@ -8,12 +8,11 @@ import com.kong.backend.Entity.*;
 import com.kong.backend.exception.AdminNotFoundException;
 import com.kong.backend.exception.PasswordMismatchException;
 import com.kong.backend.exception.UserNotFoundException;
-import com.kong.backend.repository.AdminLoginRepository;
-import com.kong.backend.repository.AdminRepository;
-import com.kong.backend.repository.UserRepository;
+import com.kong.backend.repository.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -27,6 +26,8 @@ public class AdminService {
     private final AdminLoginRepository adminLoginRepository;
     private final BCryptPasswordEncoder passwordEncoder;
     private final UserRepository userRepository;
+    private final PatientRepository patientRepository;
+    private final PatientInfoRepository patientInfoRepository;
 
     /**
      * 로그인 시도 - 성공 시 로그인 로그 저장
@@ -135,5 +136,19 @@ public class AdminService {
 
         userDto.setPatients(patientDtos);
         return userDto;
+    }
+
+    @Transactional
+    public void deleteUserByKey(Integer userKey) {
+        UserEntity user = userRepository.findById(userKey)
+                .orElseThrow(() -> new UserNotFoundException("사용자를 찾을 수 없습니다."));
+
+        // 환자 정보 먼저 삭제 → 연관된 환자 → 유저 삭제
+        for (PatientEntity patient : user.getPatients()) {
+            patientInfoRepository.deleteAll(patient.getInfos());
+        }
+        patientRepository.deleteAll(user.getPatients());
+
+        userRepository.delete(user);
     }
 }

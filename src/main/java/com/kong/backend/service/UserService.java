@@ -1,16 +1,10 @@
 package com.kong.backend.service;
 
 import com.kong.backend.DTO.*;
-import com.kong.backend.Entity.LoginEntity;
-import com.kong.backend.Entity.PatientEntity;
-import com.kong.backend.Entity.PatientInfoEntity;
-import com.kong.backend.Entity.UserEntity;
+import com.kong.backend.Entity.*;
 import com.kong.backend.exception.PasswordMismatchException;
 import com.kong.backend.exception.UserNotFoundException;
-import com.kong.backend.repository.LoginRepository;
-import com.kong.backend.repository.PatientInfoRepository;
-import com.kong.backend.repository.PatientRepository;
-import com.kong.backend.repository.UserRepository;
+import com.kong.backend.repository.*;
 import jakarta.persistence.criteria.CriteriaBuilder;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
@@ -32,6 +26,7 @@ public class UserService {
     private final BCryptPasswordEncoder passwordEncoder;
     private final PatientRepository patientRepository;
     private final PatientInfoRepository patientInfoRepository;
+    private final AlertHistoryRepository alertHistoryRepository;
 
 
     public UserEntity signup(UserSignUpDto dto) {
@@ -213,6 +208,18 @@ public class UserService {
         userRepository.save(user);
     }
 
+    public void saveAlert(Integer userKey, String eventType, String level) {
+        UserEntity user = userRepository.findById(userKey)
+                .orElseThrow(() -> new UserNotFoundException("해당 유저가 존재하지 않습니다."));
+
+        AlertHistoryEntity alert = new AlertHistoryEntity();
+        alert.setUser(user);
+        alert.setEventType(eventType);
+        alert.setAlertLevel(level);
+        alert.setDetectedAt(LocalDateTime.now());
+
+        alertHistoryRepository.save(alert);
+    }
 
 
 }

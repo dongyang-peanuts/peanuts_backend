@@ -7,7 +7,6 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import com.kong.backend.service.UserService;
-import jakarta.persistence.criteria.CriteriaBuilder;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -17,7 +16,7 @@ import jakarta.servlet.http.HttpSession;
 import java.util.List;
 import java.util.Optional;
 
-@Tag(name = "User API", description = "회원가입, 로그인, 로그아웃 관련 API")
+@Tag(name = "사용자 API", description = "회원가입, 로그인, 로그아웃 관련 API")
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/user")
