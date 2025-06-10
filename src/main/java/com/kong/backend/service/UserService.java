@@ -82,7 +82,7 @@ public class UserService {
         return user;
     }
 
-    public boolean login(String email, String rawPwd) {
+    public UserEntity login(String email, String rawPwd) {
         UserEntity user = userRepository.findByUserEmail(email)
                 .orElseThrow(() -> new UserNotFoundException("사용자 이메일이 존재하지 않습니다."));
 
@@ -97,7 +97,7 @@ public class UserService {
                 .build();
 
         loginRepository.save(loginRecord);
-        return true;
+        return user;
     }
 
     public void updateUserAddress(Integer userKey, String newAddress) {

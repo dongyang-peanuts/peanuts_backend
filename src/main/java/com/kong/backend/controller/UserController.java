@@ -2,6 +2,7 @@ package com.kong.backend.controller;
 
 import com.kong.backend.DTO.*;
 import com.kong.backend.Entity.LoginEntity;
+import com.kong.backend.Entity.UserEntity;
 import com.kong.backend.repository.LoginRepository;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -37,16 +38,18 @@ public class UserController {
     }
 
     // ✅ 사용자 로그인
-    @Operation(summary = "사용자 로그인", responses = {
+    @Operation(summary = "사용자 로그인", description = "로그인 시 userKey와 userEmail를 반환",responses = {
             @ApiResponse(responseCode = "200", description = "로그인 성공"),
             @ApiResponse(responseCode = "401", description = "비밀번호 틀림"),
             @ApiResponse(responseCode = "404", description = "이메일 없음")
     })
     @PostMapping("/login")
-    public ResponseEntity<String> login(@RequestBody LoginRequestDto dto, HttpSession session) {
-        userService.login(dto.getUserEmail(), dto.getUserPwd());
+    public ResponseEntity<UserLoginResponseDto> login(@RequestBody LoginRequestDto dto, HttpSession session) {
+        UserEntity user = userService.login(dto.getUserEmail(), dto.getUserPwd());
         session.setAttribute("user", dto.getUserEmail());
-        return ResponseEntity.ok("로그인 성공");
+
+        UserLoginResponseDto responseDto = new UserLoginResponseDto(user.getUserKey(), user.getUserEmail());
+        return ResponseEntity.ok(responseDto);
     }
 
     // ✅ 사용자 로그아웃
