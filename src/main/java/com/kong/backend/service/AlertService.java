@@ -62,4 +62,18 @@ public class AlertService {
             alertHistoryRepository.save(alert);
         }
     }
+
+    public void saveAlert(String alertLevel, String eventType, LocalDateTime detectedAt, int userKey) {
+        UserEntity user = userRepository.findById(userKey)
+                .orElseThrow(() -> new RuntimeException("사용자 없음"));
+
+        AlertHistoryEntity alert = new AlertHistoryEntity();
+        alert.setUser(user);
+        alert.setAlertLevel(alertLevel);
+        alert.setEventType(eventType);
+        alert.setDetectedAt(detectedAt);
+
+        alertHistoryRepository.save(alert);
+    }
+
 }

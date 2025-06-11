@@ -16,6 +16,15 @@ spring:
         dialect: org.hibernate.dialect.MySQLDialect
         format_sql: true
 
+  websocket:
+    message-size-limit: 5242880
+
+  servlet:
+    multipart:
+      max-request-size: 10MB
+      max-file-size: 10MB
+
+
 ssh:
   host: kongback.kro.kr
   sshPort: 22
@@ -26,3 +35,5 @@ ssh:
 
 server:
   port: 8080
+  tomcat:
+    max-http-response-header-size: 32KB
