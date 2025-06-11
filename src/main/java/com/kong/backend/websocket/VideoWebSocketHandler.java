@@ -28,7 +28,27 @@ public class VideoWebSocketHandler extends TextWebSocketHandler {
                     yoloSession = session;
                     System.out.println("✅ YOLO 서버와 연결됨");
                 }
-            }, "ws://192.168.219.171:8000/ws/fall");  // 실제 YOLO Python 서버 주소
+
+                @Override
+                protected void handleTextMessage(WebSocketSession session, TextMessage message) throws Exception {
+                    System.out.println("📥 YOLO 서버 결과 수신: " + message.getPayload());
+
+                    // 관리자에게 결과 전달
+                    for (WebSocketSession admin : adminSessions) {
+                        if (admin.isOpen()) {
+                            admin.sendMessage(message);
+                        }
+                    }
+
+                    // 사용자에게 결과 전달
+                    for (WebSocketSession user : userSessions) {
+                        if (user.isOpen()) {
+                            user.sendMessage(message);
+                        }
+                    }
+                }
+            }, "ws://192.168.219.171:8000/ws/fall");
+
         } catch (Exception e) {
             System.out.println("❌ YOLO 서버 연결 실패: " + e.getMessage());
         }
