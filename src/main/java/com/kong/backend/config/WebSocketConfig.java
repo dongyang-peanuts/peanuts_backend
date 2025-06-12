@@ -9,6 +9,7 @@ import org.springframework.web.socket.config.annotation.EnableWebSocket;
 import org.springframework.web.socket.config.annotation.WebSocketConfigurer;
 import org.springframework.web.socket.config.annotation.WebSocketHandlerRegistry;
 import org.springframework.web.socket.handler.WebSocketHandlerDecorator;
+import org.springframework.web.socket.server.standard.ServletServerContainerFactoryBean;
 import org.springframework.web.socket.handler.WebSocketHandlerDecoratorFactory;
 
 @Configuration
@@ -26,14 +27,10 @@ public class WebSocketConfig implements WebSocketConfigurer {
 
     // 여기에 메시지 크기 제한 확장 설정 추가
     @Bean
-    public WebSocketHandlerDecoratorFactory webSocketHandlerDecoratorFactory() {
-        return handler -> new WebSocketHandlerDecorator(handler) {
-            @Override
-            public void afterConnectionEstablished(WebSocketSession session) throws Exception {
-                session.setTextMessageSizeLimit(5 * 1024 * 1024); // 5MB
-                session.setBinaryMessageSizeLimit(5 * 1024 * 1024); // 5MB
-                super.afterConnectionEstablished(session);
-            }
-        };
-    }
+    public ServletServerContainerFactoryBean createWebSocketContainer() {
+        ServletServerContainerFactoryBean container = new ServletServerContainerFactoryBean();
+        container.setMaxTextMessageBufferSize(1024 * 1024);   // 1MB
+        container.setMaxBinaryMessageBufferSize(1024 * 1024); // 1MB
+        return container;
+    };
 }
