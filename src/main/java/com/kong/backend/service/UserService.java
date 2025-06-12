@@ -145,15 +145,10 @@ public class UserService {
         UserEntity user = userRepository.findById(userKey)
                 .orElseThrow(() -> new UserNotFoundException("해당 유저가 존재하지 않습니다."));
 
-        // 기존 환자 및 환자정보 삭제
-        List<PatientEntity> oldPatients = user.getPatients();
-        for (PatientEntity patient : oldPatients) {
-            patientInfoRepository.deleteAll(patient.getInfos());
-        }
-        patientRepository.deleteAll(oldPatients);
+        // 기존 환자 정보 삭제
+        List<PatientEntity> existingPatients = user.getPatients();
+        existingPatients.clear();
 
-        // 새로운 환자 및 환자정보 등록
-        List<PatientEntity> newPatientEntities = new ArrayList<>();
         for (PatientDto patientDto : newPatientList) {
             PatientEntity patient = new PatientEntity();
             patient.setPaName(patientDto.getPaName());
@@ -162,8 +157,6 @@ public class UserService {
             patient.setPaHei(patientDto.getPaHei());
             patient.setPaWei(patientDto.getPaWei());
             patient.setUser(user);
-
-            patient = patientRepository.save(patient);
 
             List<PatientInfoEntity> infoEntities = new ArrayList<>();
             for (PatientInfoDto infoDto : patientDto.getInfos()) {
@@ -179,12 +172,10 @@ public class UserService {
                 infoEntities.add(info);
             }
 
-            patientInfoRepository.saveAll(infoEntities);
             patient.setInfos(infoEntities);
-            newPatientEntities.add(patient);
+            existingPatients.add(patient); // 기존 컬렉션에 add
         }
 
-        user.setPatients(newPatientEntities);
         userRepository.save(user);
     }
 
