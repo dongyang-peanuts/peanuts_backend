@@ -77,7 +77,7 @@ public class VideoWebSocketHandler extends TextWebSocketHandler {
                         }
                     }
                 }
-            }, "ws://116.43.155.170:8765/ws/fall");
+            }, "ws://15.165.114.170:8765/ws/fall");
 
         } catch (Exception e) {
             System.out.println("❌ YOLO 서버 연결 실패: " + e.getMessage());
