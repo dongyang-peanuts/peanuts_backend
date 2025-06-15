@@ -11,7 +11,6 @@ import org.springframework.web.socket.client.WebSocketClient;
 import org.springframework.web.socket.client.standard.StandardWebSocketClient;
 import org.springframework.web.socket.handler.TextWebSocketHandler;
 
-import java.io.IOException;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -21,10 +20,8 @@ import java.util.concurrent.CopyOnWriteArrayList;
 public class VideoWebSocketHandler extends TextWebSocketHandler {
 
     private final AlertService alertService;
-
     private final List<WebSocketSession> userSessions = new CopyOnWriteArrayList<>();
     private final List<WebSocketSession> adminSessions = new CopyOnWriteArrayList<>();
-
     private WebSocketSession yoloSession;
     private final ObjectMapper mapper = new ObjectMapper();
 
@@ -46,8 +43,8 @@ public class VideoWebSocketHandler extends TextWebSocketHandler {
 
                     try {
                         JsonNode json = mapper.readTree(payload);
+                        int userKey = 1; // 고정값
 
-                        int userKey = 1; // 임시 유저 식별자
                         String alertLevel = json.get("alertLevel").asText();
                         String eventType = json.get("eventType").asText();
                         LocalDateTime detectedAt = LocalDateTime.parse(json.get("detectedAt").asText());
@@ -57,27 +54,11 @@ public class VideoWebSocketHandler extends TextWebSocketHandler {
                         System.out.println("❌ 파싱 또는 저장 실패: " + e.getMessage());
                     }
 
-                    // 관리자에게 전송
-                    for (WebSocketSession admin : adminSessions) {
-                        try {
-                            if (admin.isOpen()) {
-                                admin.sendMessage(message);
-                            }
-                        } catch (IOException e) {
-                            System.out.println("❌ 관리자 전송 실패: " + e.getMessage());
-                        }
-                    }
+                    // 관리자에게 전달
+                    broadcastMessageTo(adminSessions, message);
 
-                    // 사용자에게 전송
-                    for (WebSocketSession user : userSessions) {
-                        try {
-                            if (user.isOpen()) {
-                                user.sendMessage(message);
-                            }
-                        } catch (IOException e) {
-                            System.out.println("❌ 사용자 전송 실패: " + e.getMessage());
-                        }
-                    }
+                    // 사용자에게 전달
+                    broadcastMessageTo(userSessions, message);
                 }
             }, "ws://15.165.114.170:8765/ws/fall");
 
@@ -100,31 +81,34 @@ public class VideoWebSocketHandler extends TextWebSocketHandler {
 
     @Override
     protected void handleTextMessage(WebSocketSession session, TextMessage message) {
-        for (WebSocketSession admin : adminSessions) {
-            try {
-                if (admin.isOpen()) {
-                    admin.sendMessage(message);
-                }
-            } catch (IOException e) {
-                System.out.println("❌ 관리자 전송 실패: " + e.getMessage());
-            }
-        }
-
-        for (WebSocketSession user : userSessions) {
-            try {
-                if (user.isOpen() && !user.getId().equals(session.getId())) {
-                    user.sendMessage(message);
-                }
-            } catch (IOException e) {
-                System.out.println("❌ 사용자 전송 실패: " + e.getMessage());
-            }
-        }
+        broadcastMessageTo(adminSessions, message);
+        broadcastMessageTo(userSessions, message, session);
 
         if (yoloSession != null && yoloSession.isOpen()) {
             try {
-                yoloSession.sendMessage(message);
-            } catch (IOException e) {
+                synchronized (yoloSession) {
+                    yoloSession.sendMessage(message);
+                }
+            } catch (Exception e) {
                 System.out.println("❌ YOLO 서버로 전송 실패: " + e.getMessage());
+            }
+        }
+    }
+
+    private void broadcastMessageTo(List<WebSocketSession> sessions, TextMessage message) {
+        broadcastMessageTo(sessions, message, null);
+    }
+
+    private void broadcastMessageTo(List<WebSocketSession> sessions, TextMessage message, WebSocketSession exclude) {
+        for (WebSocketSession s : sessions) {
+            if (s.isOpen() && (exclude == null || !s.getId().equals(exclude.getId()))) {
+                try {
+                    synchronized (s) {
+                        s.sendMessage(message);
+                    }
+                } catch (Exception e) {
+                    System.out.println("❌ 메시지 전송 실패: " + e.getMessage());
+                }
             }
         }
     }
@@ -133,5 +117,8 @@ public class VideoWebSocketHandler extends TextWebSocketHandler {
     public void afterConnectionClosed(WebSocketSession session, CloseStatus status) {
         userSessions.remove(session);
         adminSessions.remove(session);
+        if (yoloSession == session) {
+            yoloSession = null;
+        }
     }
 }
