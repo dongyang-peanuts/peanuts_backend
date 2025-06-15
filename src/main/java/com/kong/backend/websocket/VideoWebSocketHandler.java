@@ -30,6 +30,12 @@ public class VideoWebSocketHandler extends TextWebSocketHandler {
         Executors.newSingleThreadExecutor().submit(() -> {
             while (true) {
                 try {
+                    if (yoloSession != null && yoloSession.isOpen()) {
+                        Thread.sleep(5000); // 연결 유지는 주기적으로 확인
+                        continue;
+                    }
+
+                    System.out.println("🔄 YOLO 서버에 연결 시도 중...");
                     WebSocketClient client = new StandardWebSocketClient();
                     client.doHandshake(new TextWebSocketHandler() {
                         @Override
@@ -39,49 +45,31 @@ public class VideoWebSocketHandler extends TextWebSocketHandler {
                         }
 
                         @Override
-                        protected void handleTextMessage(WebSocketSession session, TextMessage message) throws Exception {
-                            String payload = message.getPayload();
-                            System.out.println("📥 YOLO 서버 결과 수신: " + payload);
-                            try {
-                                JsonNode json = mapper.readTree(payload);
-                                int userKey = 1; // 예시: 고정 사용자
-                                String alertLevel = json.get("alertLevel").asText();
-                                String eventType = json.get("eventType").asText();
-                                String detectedAt = json.get("detectedAt").asText();
-                                alertService.saveAlert(alertLevel, eventType, detectedAt, userKey);
-                            } catch (Exception e) {
-                                System.out.println("❌ 알림 처리 실패: " + e.getMessage());
-                            }
-
-                            // 브로드캐스트
-                            broadcastMessageTo(adminSessions, message);
-                            broadcastMessageTo(userSessions, message);
-                        }
-
-                        @Override
                         public void handleTransportError(WebSocketSession session, Throwable exception) {
-                            System.out.println("❌ YOLO 서버 오류: " + exception.getMessage());
+                            System.out.println("❌ 전송 오류 발생: " + exception.getMessage());
                             yoloSession = null;
                         }
 
                         @Override
                         public void afterConnectionClosed(WebSocketSession session, CloseStatus status) {
-                            System.out.println("❌ YOLO 서버 연결 종료");
+                            System.out.println("❌ 연결 종료됨: " + status);
                             yoloSession = null;
                         }
 
                     }, "ws://15.165.114.170:8765/ws/fall");
 
-                    break;
+                    // 연결 후 대기
+                    Thread.sleep(5000);
                 } catch (Exception e) {
-                    System.out.println("🚨 YOLO 연결 실패, 3초 후 재시도...");
+                    System.out.println("🚨 YOLO 서버 연결 실패: " + e.getMessage());
                     try {
-                        Thread.sleep(3000);
+                        Thread.sleep(3000); // 3초 후 재시도
                     } catch (InterruptedException ignored) {}
                 }
             }
         });
     }
+
 
     @Override
     public void afterConnectionEstablished(WebSocketSession session) {
