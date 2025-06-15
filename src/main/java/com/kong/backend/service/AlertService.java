@@ -63,17 +63,30 @@ public class AlertService {
         }
     }
 
-    public void saveAlert(String alertLevel, String eventType, LocalDateTime detectedAt, int userKey) {
-        UserEntity user = userRepository.findById(userKey)
-                .orElseThrow(() -> new RuntimeException("사용자 없음"));
+    public void saveAlert(String alertLevel, String eventType, String detectedAtStr, int userKey) {
+        try {
+            UserEntity user = userRepository.findById(userKey)
+                    .orElseThrow(() -> new RuntimeException("❌ 사용자 없음: ID=" + userKey));
 
-        AlertHistoryEntity alert = new AlertHistoryEntity();
-        alert.setUser(user);
-        alert.setAlertLevel(alertLevel);
-        alert.setEventType(eventType);
-        alert.setDetectedAt(detectedAt);
+            LocalDateTime detectedAt;
+            try {
+                detectedAt = LocalDateTime.parse(detectedAtStr);
+            } catch (Exception e) {
+                System.out.println("❌ 날짜 파싱 오류: " + detectedAtStr);
+                return;
+            }
 
-        alertHistoryRepository.save(alert);
+            AlertHistoryEntity alert = new AlertHistoryEntity();
+            alert.setUser(user);
+            alert.setAlertLevel(alertLevel);
+            alert.setEventType(eventType);
+            alert.setDetectedAt(detectedAt);
+
+            alertHistoryRepository.save(alert);
+            System.out.println("✅ 알림 저장 완료: " + alertLevel + ", " + eventType);
+        } catch (Exception e) {
+            System.out.println("❌ 알림 저장 실패: " + e.getMessage());
+        }
     }
 
 }
