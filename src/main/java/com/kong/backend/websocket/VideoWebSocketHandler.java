@@ -31,58 +31,62 @@ public class VideoWebSocketHandler extends TextWebSocketHandler {
         Executors.newSingleThreadExecutor().submit(() -> {
             while (true) {
                 try {
-                    WebSocketClient client = new StandardWebSocketClient();
-                    client.doHandshake(new TextWebSocketHandler() {
-                        @Override
-                        public void afterConnectionEstablished(WebSocketSession session) {
-                            yoloSession = session;
-                            System.out.println("✅ YOLO 서버와 연결됨");
-                        }
+                    if (yoloSession == null || !yoloSession.isOpen()) {
+                        System.out.println("🔄 YOLO 서버 연결 시도 중...");
 
-                        @Override
-                        protected void handleTextMessage(WebSocketSession session, TextMessage message) {
-                            String payload = message.getPayload();
-                            System.out.println("📥 YOLO 서버 결과 수신: " + payload);
+                        WebSocketClient client = new StandardWebSocketClient();
+                        client.doHandshake(new TextWebSocketHandler() {
+                            @Override
+                            public void afterConnectionEstablished(WebSocketSession session) {
+                                yoloSession = session;
+                                System.out.println("✅ YOLO 서버와 연결됨");
+                            }
 
-                            try {
-                                JsonNode json = mapper.readTree(payload);
-                                String alertLevel = json.get("alertLevel").asText();
-                                String eventType = json.get("eventType").asText();
-                                String detectedAtStr = json.get("detectedAt").asText();
+                            @Override
+                            protected void handleTextMessage(WebSocketSession session, TextMessage message) {
+                                String payload = message.getPayload();
+                                System.out.println("📥 YOLO 서버 결과 수신: " + payload);
 
                                 try {
-                                    LocalDateTime detectedAt = LocalDateTime.parse(detectedAtStr);
-                                    int userKey = 1; // 실제 유저 연결 시 수정 가능
-                                    alertService.saveAlert(alertLevel, eventType, detectedAt, userKey);
-                                    System.out.println("✅ 알림 저장 완료");
+                                    JsonNode json = mapper.readTree(payload);
+                                    String alertLevel = json.get("alertLevel").asText();
+                                    String eventType = json.get("eventType").asText();
+                                    String detectedAtStr = json.get("detectedAt").asText();
+
+                                    try {
+                                        LocalDateTime detectedAt = LocalDateTime.parse(detectedAtStr);
+                                        int userKey = 1; // 실제 사용자 키로 교체 가능
+                                        alertService.saveAlert(alertLevel, eventType, detectedAt, userKey);
+                                        System.out.println("✅ 알림 저장 완료: " + alertLevel + ", " + eventType + " at " + detectedAtStr);
+                                    } catch (Exception e) {
+                                        System.out.println("❌ 날짜 파싱 오류: " + detectedAtStr + " - " + e.getMessage());
+                                    }
+
+                                    broadcastToAll(message);
                                 } catch (Exception e) {
-                                    System.out.println("❌ 날짜 파싱 오류: " + detectedAtStr + " - " + e.getMessage());
+                                    System.out.println("❌ 파싱 또는 저장 실패: " + e.getMessage());
                                 }
-
-                                broadcastToAll(message);
-
-                            } catch (Exception e) {
-                                System.out.println("❌ 파싱 또는 저장 실패: " + e.getMessage());
                             }
-                        }
 
-                        @Override
-                        public void afterConnectionClosed(WebSocketSession session, CloseStatus status) {
-                            System.out.println("❌ YOLO 서버 연결 종료됨");
-                            yoloSession = null;
-                        }
+                            @Override
+                            public void afterConnectionClosed(WebSocketSession session, CloseStatus status) {
+                                System.out.println("❌ YOLO 서버 연결 종료됨: " + status);
+                                yoloSession = null;
+                            }
 
-                        @Override
-                        public void handleTransportError(WebSocketSession session, Throwable exception) {
-                            System.out.println("❌ YOLO 서버 연결 오류: " + exception.getMessage());
-                            yoloSession = null;
-                        }
+                            @Override
+                            public void handleTransportError(WebSocketSession session, Throwable exception) {
+                                System.out.println("❌ YOLO 서버 연결 오류: " + exception.getMessage());
+                                yoloSession = null;
+                            }
 
-                    }, "ws://15.165.114.170:8765/ws/fall"); // 🟡 실제 IP나 도메인으로 변경
+                        }, "ws://15.165.114.170:8765/ws/fall"); // 실제 YOLO 서버 주소 사용
 
-                    break;
+                        // break 제거 → 항상 연결 유지
+                    }
+                    Thread.sleep(3000); // 매 3초마다 연결 상태 확인
                 } catch (Exception e) {
-                    System.out.println("🚨 YOLO 서버 연결 실패. 3초 후 재시도...");
+                    System.out.println("🚨 YOLO 연결 실패 또는 예외 발생: " + e.getMessage());
                     try {
                         Thread.sleep(3000);
                     } catch (InterruptedException ignored) {}
