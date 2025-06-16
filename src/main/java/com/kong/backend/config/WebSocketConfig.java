@@ -21,8 +21,14 @@ public class WebSocketConfig implements WebSocketConfigurer {
 
     @Override
     public void registerWebSocketHandlers(WebSocketHandlerRegistry registry) {
+        // 일반 사용자
         registry.addHandler(handler, "/ws/video").setAllowedOrigins("*");
+
+        // 관리자
         registry.addHandler(handler, "/ws/admin/monitor").setAllowedOrigins("*");
+
+        // 알림
+        registry.addHandler(handler, "/ws/alert").setAllowedOrigins("*");
     }
 
     // 여기에 메시지 크기 제한 확장 설정 추가
