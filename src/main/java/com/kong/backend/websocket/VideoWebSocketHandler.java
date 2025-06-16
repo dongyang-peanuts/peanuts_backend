@@ -24,9 +24,8 @@ public class VideoWebSocketHandler extends TextWebSocketHandler {
 
     private final List<WebSocketSession> videoSessions = new CopyOnWriteArrayList<>();
     private final List<WebSocketSession> alertSessions = new CopyOnWriteArrayList<>();
-    private WebSocketSession yoloSession;
+    private volatile WebSocketSession yoloSession; // ⚠ volatile로 동기화
 
-    // YOLO 전송 큐
     private final BlockingQueue<String> yoloQueue = new LinkedBlockingQueue<>();
 
     @PostConstruct
@@ -46,6 +45,14 @@ public class VideoWebSocketHandler extends TextWebSocketHandler {
                         client.doHandshake(new TextWebSocketHandler() {
                             @Override
                             public void afterConnectionEstablished(WebSocketSession session) {
+                                if (yoloSession != null && yoloSession.isOpen()) {
+                                    try {
+                                        yoloSession.close(); // 이전 연결 종료
+                                        System.out.println("🔁 이전 YOLO 세션 종료");
+                                    } catch (Exception e) {
+                                        System.out.println("❌ 이전 YOLO 세션 종료 실패: " + e.getMessage());
+                                    }
+                                }
                                 yoloSession = session;
                                 System.out.println("✅ YOLO 서버와 연결됨");
                             }
@@ -79,16 +86,23 @@ public class VideoWebSocketHandler extends TextWebSocketHandler {
                             @Override
                             public void afterConnectionClosed(WebSocketSession session, CloseStatus status) {
                                 System.out.println("❌ YOLO 연결 종료됨: " + status);
-                                yoloSession = null;
+                                if (session == yoloSession) {
+                                    yoloSession = null;
+                                }
                             }
 
                             @Override
                             public void handleTransportError(WebSocketSession session, Throwable exception) {
                                 System.out.println("❌ YOLO 연결 오류: " + exception.getMessage());
-                                yoloSession = null;
+                                if (session == yoloSession) {
+                                    try {
+                                        session.close();
+                                    } catch (Exception ignored) {}
+                                    yoloSession = null;
+                                }
                             }
 
-                        }, "ws://15.165.114.170:8765/ws/fall"); // YOLO 서버 주소
+                        }, "ws://15.165.114.170:8765/ws/fall");
                     }
 
                     Thread.sleep(3000);
@@ -106,7 +120,7 @@ public class VideoWebSocketHandler extends TextWebSocketHandler {
         Executors.newSingleThreadExecutor().submit(() -> {
             while (true) {
                 try {
-                    String message = yoloQueue.take(); // 블로킹
+                    String message = yoloQueue.take();
                     if (yoloSession != null && yoloSession.isOpen()) {
                         synchronized (yoloSession) {
                             yoloSession.sendMessage(new TextMessage(message));
@@ -140,12 +154,8 @@ public class VideoWebSocketHandler extends TextWebSocketHandler {
     @Override
     protected void handleTextMessage(WebSocketSession session, TextMessage message) {
         try {
-            // 1. 영상 프레임 브로드캐스트 (관리자 포함)
             broadcastTo(videoSessions, message);
-
-            // 2. YOLO 서버로는 큐에 저장하여 비동기 전송
             yoloQueue.offer(message.getPayload());
-
         } catch (Exception e) {
             System.out.println("❌ 프레임 처리 오류: " + e.getMessage());
         }
@@ -170,6 +180,20 @@ public class VideoWebSocketHandler extends TextWebSocketHandler {
         videoSessions.remove(session);
         alertSessions.remove(session);
         if (session == yoloSession) {
+            yoloSession = null;
+            System.out.println("🧹 YOLO 세션 정리 완료");
+        }
+    }
+
+    @Override
+    public void handleTransportError(WebSocketSession session, Throwable exception) {
+        System.out.println("❌ WebSocket 전송 오류: " + exception.getMessage());
+        videoSessions.remove(session);
+        alertSessions.remove(session);
+        if (session == yoloSession) {
+            try {
+                session.close();
+            } catch (Exception ignored) {}
             yoloSession = null;
         }
     }
