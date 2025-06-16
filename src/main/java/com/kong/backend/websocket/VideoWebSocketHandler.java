@@ -13,8 +13,7 @@ import org.springframework.web.socket.handler.TextWebSocketHandler;
 
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.concurrent.CopyOnWriteArrayList;
-import java.util.concurrent.Executors;
+import java.util.concurrent.*;
 
 @Component
 @RequiredArgsConstructor
@@ -27,8 +26,16 @@ public class VideoWebSocketHandler extends TextWebSocketHandler {
     private final List<WebSocketSession> alertSessions = new CopyOnWriteArrayList<>();
     private WebSocketSession yoloSession;
 
+    // YOLO 전송 큐
+    private final BlockingQueue<String> yoloQueue = new LinkedBlockingQueue<>();
+
     @PostConstruct
-    public void connectToYoloServer() {
+    public void init() {
+        startYoloConnectionLoop();
+        startYoloSendingThread();
+    }
+
+    private void startYoloConnectionLoop() {
         Executors.newSingleThreadExecutor().submit(() -> {
             while (true) {
                 try {
@@ -46,7 +53,7 @@ public class VideoWebSocketHandler extends TextWebSocketHandler {
                             @Override
                             protected void handleTextMessage(WebSocketSession session, TextMessage message) {
                                 String payload = message.getPayload();
-                                System.out.println("📥 YOLO 서버 결과 수신: " + payload);
+                                System.out.println("📥 YOLO 결과 수신: " + payload);
 
                                 try {
                                     JsonNode json = mapper.readTree(payload);
@@ -56,14 +63,14 @@ public class VideoWebSocketHandler extends TextWebSocketHandler {
 
                                     try {
                                         LocalDateTime detectedAt = LocalDateTime.parse(detectedAtStr);
-                                        int userKey = 1; // TODO: 실제 사용자 키로 교체
+                                        int userKey = 1;
                                         alertService.saveAlert(alertLevel, eventType, detectedAt, userKey);
-                                        System.out.println("✅ 알림 저장 완료: " + alertLevel + ", " + eventType + " at " + detectedAtStr);
+                                        System.out.println("✅ 알림 저장 완료");
                                     } catch (Exception e) {
                                         System.out.println("❌ 날짜 파싱 오류: " + detectedAtStr + " - " + e.getMessage());
                                     }
 
-                                    broadcastTo(alertSessions, message);
+                                    broadcastTo(alertSessions, new TextMessage(payload));
                                 } catch (Exception e) {
                                     System.out.println("❌ YOLO 메시지 파싱 실패: " + e.getMessage());
                                 }
@@ -71,27 +78,44 @@ public class VideoWebSocketHandler extends TextWebSocketHandler {
 
                             @Override
                             public void afterConnectionClosed(WebSocketSession session, CloseStatus status) {
-                                System.out.println("❌ YOLO 서버 연결 종료됨: " + status);
+                                System.out.println("❌ YOLO 연결 종료됨: " + status);
                                 yoloSession = null;
                             }
 
                             @Override
                             public void handleTransportError(WebSocketSession session, Throwable exception) {
-                                System.out.println("❌ YOLO 서버 연결 오류: " + exception.getMessage());
+                                System.out.println("❌ YOLO 연결 오류: " + exception.getMessage());
                                 yoloSession = null;
                             }
 
-                        }, "ws://15.165.114.170:8765/ws/fall");
-
-                        // break 제거 → 항상 연결 시도 유지
+                        }, "ws://15.165.114.170:8765/ws/fall"); // YOLO 서버 주소
                     }
 
-                    Thread.sleep(3000); // 매 3초마다 연결 확인
+                    Thread.sleep(3000);
                 } catch (Exception e) {
                     System.out.println("🚨 YOLO 연결 실패: " + e.getMessage());
                     try {
                         Thread.sleep(3000);
                     } catch (InterruptedException ignored) {}
+                }
+            }
+        });
+    }
+
+    private void startYoloSendingThread() {
+        Executors.newSingleThreadExecutor().submit(() -> {
+            while (true) {
+                try {
+                    String message = yoloQueue.take(); // 블로킹
+                    if (yoloSession != null && yoloSession.isOpen()) {
+                        synchronized (yoloSession) {
+                            yoloSession.sendMessage(new TextMessage(message));
+                        }
+                    } else {
+                        System.out.println("⚠️ YOLO 세션 없음. 전송 보류됨.");
+                    }
+                } catch (Exception e) {
+                    System.out.println("❌ YOLO 전송 오류: " + e.getMessage());
                 }
             }
         });
@@ -105,29 +129,25 @@ public class VideoWebSocketHandler extends TextWebSocketHandler {
             videoSessions.add(session);
             System.out.println("✅ 사용자 앱(WebSocket 영상) 연결됨");
         } else if (path.contains("/ws/admin/monitor")) {
-            videoSessions.add(session); // 관리자도 프레임 수신 대상
-            System.out.println("✅ 관리자 모니터링(WebSocket 영상) 연결됨");
+            videoSessions.add(session);
+            System.out.println("✅ 관리자(WebSocket 영상) 연결됨");
         } else if (path.contains("/ws/alert")) {
             alertSessions.add(session);
-            System.out.println("✅ 관리자 알림 수신(WebSocket 알림) 연결됨");
+            System.out.println("✅ 관리자(WebSocket 알림) 연결됨");
         }
     }
 
     @Override
     protected void handleTextMessage(WebSocketSession session, TextMessage message) {
         try {
-            // 사용자 앱이 보낸 프레임 → YOLO 서버로 전달
-            if (yoloSession != null && yoloSession.isOpen()) {
-                synchronized (yoloSession) {
-                    yoloSession.sendMessage(message);
-                }
-            }
-
-            // 관리자/사용자 프레임 수신 대상에게 중계
+            // 1. 영상 프레임 브로드캐스트 (관리자 포함)
             broadcastTo(videoSessions, message);
 
+            // 2. YOLO 서버로는 큐에 저장하여 비동기 전송
+            yoloQueue.offer(message.getPayload());
+
         } catch (Exception e) {
-            System.out.println("❌ YOLO 서버 전송 실패: " + e.getMessage());
+            System.out.println("❌ 프레임 처리 오류: " + e.getMessage());
         }
     }
 
@@ -140,7 +160,7 @@ public class VideoWebSocketHandler extends TextWebSocketHandler {
                     }
                 }
             } catch (Exception e) {
-                System.out.println("❌ 전송 실패: " + e.getMessage());
+                System.out.println("❌ 클라이언트 전송 실패: " + e.getMessage());
             }
         }
     }
