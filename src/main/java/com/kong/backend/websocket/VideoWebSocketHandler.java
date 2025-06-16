@@ -115,6 +115,9 @@ public class VideoWebSocketHandler extends TextWebSocketHandler {
                     yoloSession.sendMessage(message);
                 }
             }
+
+            broadcastToAll(message);
+
         } catch (Exception e) {
             System.out.println("❌ YOLO 서버로 전송 실패: " + e.getMessage());
         }
