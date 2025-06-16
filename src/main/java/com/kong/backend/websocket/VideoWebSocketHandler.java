@@ -21,10 +21,11 @@ import java.util.concurrent.Executors;
 public class VideoWebSocketHandler extends TextWebSocketHandler {
 
     private final AlertService alertService;
-    private final List<WebSocketSession> userSessions = new CopyOnWriteArrayList<>();
-    private final List<WebSocketSession> adminSessions = new CopyOnWriteArrayList<>();
-    private WebSocketSession yoloSession;
     private final ObjectMapper mapper = new ObjectMapper();
+
+    private final List<WebSocketSession> videoSessions = new CopyOnWriteArrayList<>();
+    private final List<WebSocketSession> alertSessions = new CopyOnWriteArrayList<>();
+    private WebSocketSession yoloSession;
 
     @PostConstruct
     public void connectToYoloServer() {
@@ -55,16 +56,16 @@ public class VideoWebSocketHandler extends TextWebSocketHandler {
 
                                     try {
                                         LocalDateTime detectedAt = LocalDateTime.parse(detectedAtStr);
-                                        int userKey = 1; // 실제 사용자 키로 교체 가능
+                                        int userKey = 1; // TODO: 실제 사용자 키로 교체
                                         alertService.saveAlert(alertLevel, eventType, detectedAt, userKey);
                                         System.out.println("✅ 알림 저장 완료: " + alertLevel + ", " + eventType + " at " + detectedAtStr);
                                     } catch (Exception e) {
                                         System.out.println("❌ 날짜 파싱 오류: " + detectedAtStr + " - " + e.getMessage());
                                     }
 
-                                    broadcastToAll(message);
+                                    broadcastTo(alertSessions, message);
                                 } catch (Exception e) {
-                                    System.out.println("❌ 파싱 또는 저장 실패: " + e.getMessage());
+                                    System.out.println("❌ YOLO 메시지 파싱 실패: " + e.getMessage());
                                 }
                             }
 
@@ -80,13 +81,14 @@ public class VideoWebSocketHandler extends TextWebSocketHandler {
                                 yoloSession = null;
                             }
 
-                        }, "ws://15.165.114.170:8765/ws/fall"); // 실제 YOLO 서버 주소 사용
+                        }, "ws://15.165.114.170:8765/ws/fall");
 
-                        // break 제거 → 항상 연결 유지
+                        // break 제거 → 항상 연결 시도 유지
                     }
-                    Thread.sleep(3000); // 매 3초마다 연결 상태 확인
+
+                    Thread.sleep(3000); // 매 3초마다 연결 확인
                 } catch (Exception e) {
-                    System.out.println("🚨 YOLO 연결 실패 또는 예외 발생: " + e.getMessage());
+                    System.out.println("🚨 YOLO 연결 실패: " + e.getMessage());
                     try {
                         Thread.sleep(3000);
                     } catch (InterruptedException ignored) {}
@@ -98,33 +100,39 @@ public class VideoWebSocketHandler extends TextWebSocketHandler {
     @Override
     public void afterConnectionEstablished(WebSocketSession session) {
         String path = session.getUri().getPath();
-        if (path.contains("/ws/admin/monitor")) {
-            adminSessions.add(session);
-            System.out.println("✅ 관리자 접속");
-        } else if (path.contains("/ws/video")) {
-            userSessions.add(session);
-            System.out.println("✅ 사용자 접속");
+
+        if (path.contains("/ws/video")) {
+            videoSessions.add(session);
+            System.out.println("✅ 사용자 앱(WebSocket 영상) 연결됨");
+        } else if (path.contains("/ws/admin/monitor")) {
+            videoSessions.add(session); // 관리자도 프레임 수신 대상
+            System.out.println("✅ 관리자 모니터링(WebSocket 영상) 연결됨");
+        } else if (path.contains("/ws/alert")) {
+            alertSessions.add(session);
+            System.out.println("✅ 관리자 알림 수신(WebSocket 알림) 연결됨");
         }
     }
 
     @Override
     protected void handleTextMessage(WebSocketSession session, TextMessage message) {
         try {
+            // 사용자 앱이 보낸 프레임 → YOLO 서버로 전달
             if (yoloSession != null && yoloSession.isOpen()) {
                 synchronized (yoloSession) {
                     yoloSession.sendMessage(message);
                 }
             }
 
-            broadcastToAll(message);
+            // 관리자/사용자 프레임 수신 대상에게 중계
+            broadcastTo(videoSessions, message);
 
         } catch (Exception e) {
-            System.out.println("❌ YOLO 서버로 전송 실패: " + e.getMessage());
+            System.out.println("❌ YOLO 서버 전송 실패: " + e.getMessage());
         }
     }
 
-    private void broadcastToAll(TextMessage message) {
-        for (WebSocketSession session : userSessions) {
+    private void broadcastTo(List<WebSocketSession> sessions, TextMessage message) {
+        for (WebSocketSession session : sessions) {
             try {
                 if (session.isOpen()) {
                     synchronized (session) {
@@ -132,27 +140,15 @@ public class VideoWebSocketHandler extends TextWebSocketHandler {
                     }
                 }
             } catch (Exception e) {
-                System.out.println("❌ 사용자 전송 실패: " + e.getMessage());
-            }
-        }
-
-        for (WebSocketSession session : adminSessions) {
-            try {
-                if (session.isOpen()) {
-                    synchronized (session) {
-                        session.sendMessage(message);
-                    }
-                }
-            } catch (Exception e) {
-                System.out.println("❌ 관리자 전송 실패: " + e.getMessage());
+                System.out.println("❌ 전송 실패: " + e.getMessage());
             }
         }
     }
 
     @Override
     public void afterConnectionClosed(WebSocketSession session, CloseStatus status) {
-        userSessions.remove(session);
-        adminSessions.remove(session);
+        videoSessions.remove(session);
+        alertSessions.remove(session);
         if (session == yoloSession) {
             yoloSession = null;
         }
