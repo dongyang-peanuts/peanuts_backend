@@ -28,4 +28,7 @@ public class AlertHistoryEntity {
 
     @Column(nullable = false)
     private LocalDateTime detectedAt; // 감지 시각
+
+    @Column(name = "video_path")
+    private String videoPath;
 }

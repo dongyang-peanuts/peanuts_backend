@@ -39,7 +39,7 @@ public class VideoWebSocketHandler extends TextWebSocketHandler {
 
     @PostConstruct
     public void init() {
-        startYoloConnectionLoop();
+//        startYoloConnectionLoop();
         startYoloSendingThread();
     }
 
@@ -68,11 +68,12 @@ public class VideoWebSocketHandler extends TextWebSocketHandler {
                                     String alertLevel = json.get("alertLevel").asText();
                                     String eventType = json.get("eventType").asText();
                                     String detectedAtStr = json.get("detectedAt").asText();
+                                    String videoPath = json.has("videoPath") ? json.get("videoPath").asText() : null;
 
                                     try {
                                         LocalDateTime detectedAt = LocalDateTime.parse(detectedAtStr);
                                         int userKey = 1;
-                                        alertService.saveAlert(alertLevel, eventType, detectedAt, userKey);
+                                        alertService.saveAlert(alertLevel, eventType, detectedAt, userKey,videoPath);
                                         System.out.println("✅ 알림 저장 완료");
                                     } catch (Exception e) {
                                         System.out.println("❌ 날짜 파싱 오류: " + detectedAtStr + " - " + e.getMessage());
@@ -96,7 +97,7 @@ public class VideoWebSocketHandler extends TextWebSocketHandler {
                                 yoloSession = null;
                             }
 
-                        }, "ws://15.165.114.170:8765/ws/fall");
+                        }, "ws://192.168.219.171:8765/ws/fall");
                     }
 
                     Thread.sleep(3000);

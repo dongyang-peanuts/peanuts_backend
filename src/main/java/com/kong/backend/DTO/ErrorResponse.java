@@ -1,14 +1,10 @@
 package com.kong.backend.DTO;
 
-import lombok.AllArgsConstructor;
-import lombok.Getter;
+import io.swagger.v3.oas.annotations.media.Schema;
 
-/**
- * 예외 발생 시 JSON 형태로 반환될 응답 구조
- */
-@Getter
-@AllArgsConstructor
-public class ErrorResponse {
-    private int status;     // HTTP 상태 코드
-    private String message; // 에러 메시지
-}
+@Schema(description = "에러 응답")
+public record ErrorResponse(
+        @Schema(example = "409") int status,
+        @Schema(example = "중복 충돌: (paKey=123, diseaseCode=ARTH, predictedAt=2025-09-10T05:05:00Z)")
+        String message
+) {}

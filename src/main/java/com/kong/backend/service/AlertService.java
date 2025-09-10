@@ -63,7 +63,7 @@ public class AlertService {
         }
     }
 
-    public void saveAlert(String alertLevel, String eventType, LocalDateTime detectedAt, int userKey) {
+    public void saveAlert(String alertLevel, String eventType, LocalDateTime detectedAt, int userKey, String videoPath) {
         try {
             UserEntity user = userRepository.findById(userKey)
                     .orElseThrow(() -> new RuntimeException("❌ 사용자 없음: ID=" + userKey));
@@ -73,6 +73,7 @@ public class AlertService {
             alert.setAlertLevel(alertLevel);
             alert.setEventType(eventType);
             alert.setDetectedAt(detectedAt);
+            alert.setVideoPath(videoPath);
 
             alertHistoryRepository.save(alert);
             System.out.println("✅ 알림 저장 완료: " + alertLevel + ", " + eventType + " at " + detectedAt);
