@@ -96,11 +96,11 @@ public class VideoWebSocketHandler extends TextWebSocketHandler {
         try {
             JsonNode json = mapper.readTree(payload);
 
-            String eventType = getTextOrNull(json, "eventType"); // "낙상" | "낙상 해제"
-            String pose      = getTextOrNull(json, "pose");      // "stand" | "sit" | "lay" | "unknown"
-            Double layRate   = getDoubleOrNull(json, "layRate"); // 0.0 ~ 1.0
-            Boolean fall     = getBooleanOrNull(json, "fall");   // true | false
-            Double ts        = getDoubleOrNull(json, "ts");      // epoch seconds (float)
+            String eventType = getTextOrNull(json, "eventType");
+            String pose      = getTextOrNull(json, "pose");
+            Double layRate   = getDoubleOrNull(json, "layRate");
+            Boolean fall     = getBooleanOrNull(json, "fall");
+            Double ts        = getDoubleOrNull(json, "ts");
 
             // 필수값 검증
             if (eventType == null || pose == null || layRate == null || fall == null || ts == null) {
@@ -108,32 +108,38 @@ public class VideoWebSocketHandler extends TextWebSocketHandler {
                 return;
             }
 
-            // 타임스탬프 변환(KST)
+            // 1) 항상 저장
             LocalDateTime detectedAt = tsToLocalDateTime(ts, KST);
-
-            // alertLevel 산출(예시 규칙)
             String alertLevel = classifyAlertLevel(eventType, pose, layRate, fall);
-
-            // userKey 식별(실서비스는 JWT/핸드셰이크로 세션에 심어두고 꺼내세요)
             int userKey = resolveUserKey(json);
 
-            // DB 저장 (확장된 AlertService 시그니처 사용)
             alertService.saveAlert(
-                    alertLevel,
-                    eventType,
-                    detectedAt,
-                    userKey,
-                    pose,
-                    layRate,
-                    fall,
-                    ts,
-                    null // videoPath 필요 시 세팅
+                    alertLevel, eventType, detectedAt, userKey,
+                    pose, layRate, fall, ts, null
             );
 
-            // 관리자 알림 채널로 원문 그대로 브로드캐스트
+            // 2) 관리자 알림 채널에는 항상 브로드캐스트(변경 없음)
             broadcastTo(alertSessions, new TextMessage(payload));
 
-            System.out.println("✅ 알림 저장 완료 [" + alertLevel + "] " + eventType +
+            // 3) 라즈베리파이(클라이언트)에는 fall == true 일 때만 전송
+            if (Boolean.TRUE.equals(fall)) {
+                // 원문 그대로 보내도 되고, 필요하면 경량 메시지로 변환해도 됨
+                // 예) 최소 필드만 담은 경량 메시지 전송:
+            /*
+            ObjectNode out = mapper.createObjectNode();
+            out.put("type", "FALL_ALERT");
+            out.put("eventType", eventType);
+            out.put("ts", ts);
+            out.put("alertLevel", alertLevel);
+            broadcastTo(deviceSessions, new TextMessage(mapper.writeValueAsString(out)));
+            */
+                // 여기선 간단히 원문을 그대로 전달
+                broadcastTo(deviceSessions, new TextMessage(payload));
+            } else {
+                System.out.println("↪ fall=false → 라즈베리파이로는 전송하지 않음");
+            }
+
+            System.out.println("✅ 저장 완료 [" + alertLevel + "] " + eventType +
                     " @ " + detectedAt.format(TS_FMT));
 
         } catch (Exception e) {
