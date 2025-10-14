@@ -32,6 +32,9 @@ ssh:
   privatekey: src/main/resources/dbssh/DDANG_KONG-KEY.pem
   database_port: 3307
 
+video:
+  storage:
+    dir: /var/app/videos
 
 server:
   port: 8080

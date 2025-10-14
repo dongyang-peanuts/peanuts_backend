@@ -3,6 +3,7 @@ package com.kong.backend.websocket;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.kong.backend.service.AlertService;
+import com.kong.backend.service.DeviceControlService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.web.socket.*;
@@ -20,10 +21,12 @@ public class VideoWebSocketHandler extends TextWebSocketHandler {
     private final AlertService alertService;
     private final ObjectMapper mapper = new ObjectMapper();
 
-    // 세션 보관
+    // 세션 보관 (브라우저 쪽만 유지)
     private final Set<WebSocketSession> videoSessions  = ConcurrentHashMap.newKeySet(); // 사용자/관리자 영상 미러링
     private final Set<WebSocketSession> alertSessions  = ConcurrentHashMap.newKeySet(); // 관리자 알림 구독
-    private final Set<WebSocketSession> deviceSessions = ConcurrentHashMap.newKeySet(); // Pi(낙상 감지) 연결
+
+    // ✅ 디바이스 세션은 서비스로 위임 (REST로도 제어 가능하게)
+    private final DeviceControlService deviceControlService;
 
     private static final ZoneId KST = ZoneId.of("Asia/Seoul");
     private static final DateTimeFormatter TS_FMT = DateTimeFormatter.ISO_LOCAL_DATE_TIME;
@@ -39,7 +42,7 @@ public class VideoWebSocketHandler extends TextWebSocketHandler {
             alertSessions.add(session);
             System.out.println("✅ 알림 채널 연결됨: " + path);
         } else if (path.contains("/ws/fall")) { // 라즈베리파이(파이썬) 낙상 감지 이벤트 푸시
-            deviceSessions.add(session);
+            deviceControlService.registerDevice(session); // ⬅️ 서비스에 등록
             System.out.println("✅ 디바이스 채널 연결됨: " + path);
         } else {
             System.out.println("ℹ️ 알 수 없는 경로로 연결: " + path);
@@ -85,7 +88,8 @@ public class VideoWebSocketHandler extends TextWebSocketHandler {
     public void afterConnectionClosed(WebSocketSession session, CloseStatus status) {
         videoSessions.remove(session);
         alertSessions.remove(session);
-        deviceSessions.remove(session);
+        // ⬇️ 디바이스 세션 해제는 서비스로 위임
+        deviceControlService.unregisterDevice(session);
     }
 
     // ===================== 디바이스 이벤트 처리 =====================
@@ -123,18 +127,8 @@ public class VideoWebSocketHandler extends TextWebSocketHandler {
 
             // 3) 라즈베리파이(클라이언트)에는 fall == true 일 때만 전송
             if (Boolean.TRUE.equals(fall)) {
-                // 원문 그대로 보내도 되고, 필요하면 경량 메시지로 변환해도 됨
-                // 예) 최소 필드만 담은 경량 메시지 전송:
-            /*
-            ObjectNode out = mapper.createObjectNode();
-            out.put("type", "FALL_ALERT");
-            out.put("eventType", eventType);
-            out.put("ts", ts);
-            out.put("alertLevel", alertLevel);
-            broadcastTo(deviceSessions, new TextMessage(mapper.writeValueAsString(out)));
-            */
-                // 여기선 간단히 원문을 그대로 전달
-                broadcastTo(deviceSessions, new TextMessage(payload));
+                // ✅ 서비스가 관리하는 디바이스 세션들로 브로드캐스트
+                deviceControlService.broadcastToDevices(new TextMessage(payload));
             } else {
                 System.out.println("↪ fall=false → 라즈베리파이로는 전송하지 않음");
             }
