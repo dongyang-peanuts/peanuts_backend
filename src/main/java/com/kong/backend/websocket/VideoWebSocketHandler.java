@@ -2,6 +2,7 @@ package com.kong.backend.websocket;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.kong.backend.service.AlertService;
 import com.kong.backend.service.DeviceControlService;
 import lombok.RequiredArgsConstructor;
@@ -41,8 +42,8 @@ public class VideoWebSocketHandler extends TextWebSocketHandler {
         } else if (path.contains("/ws/alert")) {
             alertSessions.add(session);
             System.out.println("✅ 알림 채널 연결됨: " + path);
-        } else if (path.contains("/ws/fall")) { // 라즈베리파이(파이썬) 낙상 감지 이벤트 푸시
-            deviceControlService.registerDevice(session); // ⬅️ 서비스에 등록
+        } else if (path.contains("/ws/fall")) { // 라즈베리파이(파이썬) 낙상/배회 이벤트 푸시
+            deviceControlService.registerDevice(session);
             System.out.println("✅ 디바이스 채널 연결됨: " + path);
         } else {
             System.out.println("ℹ️ 알 수 없는 경로로 연결: " + path);
@@ -55,13 +56,11 @@ public class VideoWebSocketHandler extends TextWebSocketHandler {
         String path = session.getUri() != null ? session.getUri().getPath() : "";
         try {
             if (path.contains("/ws/fall")) {
-                // 라즈베리파이가 보내는 이벤트(JSON) → 파싱/저장/브로드캐스트
                 onDeviceEvent(message.getPayload());
             } else if (path.contains("/ws/video") || path.contains("/ws/admin/monitor")) {
-                // 영상 프레임/메시지 미러링(필요 시 유지)
                 broadcastTo(videoSessions, message);
             } else if (path.contains("/ws/alert")) {
-                // 알림 채널로 들어오는 메시지는 일반적으로 없음(무시)
+                // 일반적으로 수신 없음
             } else {
                 System.out.println("ℹ️ 처리되지 않은 경로 메시지: " + path);
             }
@@ -88,7 +87,6 @@ public class VideoWebSocketHandler extends TextWebSocketHandler {
     public void afterConnectionClosed(WebSocketSession session, CloseStatus status) {
         videoSessions.remove(session);
         alertSessions.remove(session);
-        // ⬇️ 디바이스 세션 해제는 서비스로 위임
         deviceControlService.unregisterDevice(session);
     }
 
@@ -100,45 +98,62 @@ public class VideoWebSocketHandler extends TextWebSocketHandler {
         try {
             JsonNode json = mapper.readTree(payload);
 
-            String eventType = getTextOrNull(json, "eventType");
-            String pose      = getTextOrNull(json, "pose");
-            Double layRate   = getDoubleOrNull(json, "layRate");
-            Boolean fall     = getBooleanOrNull(json, "fall");
-            Double ts        = getDoubleOrNull(json, "ts");
+            String eventType      = getTextOrNull(json, "eventType");
+            Boolean fall          = getBooleanOrNull(json, "fall");
+            Double layRate        = getDoubleOrNull(json, "layRate");
+            String wanderState    = getTextOrNull(json, "wanderState");   // NORMAL / WANDERING
+            Double wanderProb     = getDoubleOrNull(json, "wanderProb");  // 0.0 ~ 1.0
+            String wanderPosture  = getTextOrNull(json, "wanderPosture"); // LYING / STANDING ...
+            Double ts             = getDoubleOrNull(json, "ts");
 
             // 필수값 검증
-            if (eventType == null || pose == null || layRate == null || fall == null || ts == null) {
+            if (eventType == null || fall == null || layRate == null || ts == null) {
                 System.out.println("❌ 필수 필드 누락: " + payload);
                 return;
             }
 
             // 1) 항상 저장
             LocalDateTime detectedAt = tsToLocalDateTime(ts, KST);
-            String alertLevel = classifyAlertLevel(eventType, pose, layRate, fall);
             int userKey = resolveUserKey(json);
 
+            String alertLevel = classifyAlertLevel(eventType, layRate, fall, wanderState, wanderProb);
+
+            // pose 자리에 wanderPosture 매핑(시그니처 유지)
             alertService.saveAlert(
-                    alertLevel, eventType, detectedAt, userKey,
-                    pose, layRate, fall, ts, null
+                    alertLevel,
+                    eventType,
+                    detectedAt,
+                    userKey,
+                    /* pose */ wanderPosture,
+                    layRate,
+                    fall,
+                    ts,
+                    null
             );
 
-            // 2) 관리자 알림 채널에는 항상 브로드캐스트(변경 없음)
-            broadcastTo(alertSessions, new TextMessage(payload));
+            // 2) 클라이언트(관리자 알림 + 디바이스) 모두에 항상 브로드캐스트
+            String enriched = enrichPayloadForClients(json, alertLevel, detectedAt, userKey);
+            broadcastTo(alertSessions, new TextMessage(enriched));                // 관리자
+            deviceControlService.broadcastToDevices(new TextMessage(enriched));   // 디바이스
 
-            // 3) 라즈베리파이(클라이언트)에는 fall == true 일 때만 전송
-            if (Boolean.TRUE.equals(fall)) {
-                // ✅ 서비스가 관리하는 디바이스 세션들로 브로드캐스트
-                deviceControlService.broadcastToDevices(new TextMessage(payload));
-            } else {
-                System.out.println("↪ fall=false → 라즈베리파이로는 전송하지 않음");
-            }
-
-            System.out.println("✅ 저장 완료 [" + alertLevel + "] " + eventType +
+            System.out.println("✅ 저장/전송 완료 [" + alertLevel + "] " + eventType +
                     " @ " + detectedAt.format(TS_FMT));
 
         } catch (Exception e) {
             System.out.println("❌ 디바이스 이벤트 파싱 실패: " + e.getMessage());
         }
+    }
+
+    /** 클라이언트로 보낼 페이로드에 부가 정보 추가 */
+    private String enrichPayloadForClients(JsonNode original,
+                                           String alertLevel,
+                                           LocalDateTime detectedAt,
+                                           int userKey) {
+        ObjectNode node = original.deepCopy();
+        node.put("alertLevel", alertLevel);
+        node.put("detectedAtIso", detectedAt.format(TS_FMT));
+        node.put("userKey", userKey);
+        return node.toString();
     }
 
     // ===================== 브로드캐스트 유틸 =====================
@@ -189,10 +204,19 @@ public class VideoWebSocketHandler extends TextWebSocketHandler {
         return Instant.ofEpochSecond(seconds, nanos).atZone(zoneId).toLocalDateTime();
     }
 
-    private String classifyAlertLevel(String eventType, String pose, double layRate, boolean fall) {
+    /** 낙상/배회 혼합 스키마 대응 알림 레벨 분류 (레벨 산정만 유지) */
+    private String classifyAlertLevel(String eventType,
+                                      double layRate,
+                                      boolean fall,
+                                      String wanderState,
+                                      Double wanderProb) {
         if ("낙상 해제".equals(eventType)) return "RECOVERY";
         if (fall) return "HIGH";
-        if ("lay".equalsIgnoreCase(pose) && layRate > 0.6) return "MEDIUM";
+        boolean wanderingHigh =
+                "WANDERING".equalsIgnoreCase(String.valueOf(wanderState)) &&
+                        wanderProb != null && wanderProb >= 0.80;
+        if (wanderingHigh) return "MEDIUM";
+        if (layRate > 0.6) return "MEDIUM";
         if (layRate > 0.3) return "LOW";
         return "INFO";
     }

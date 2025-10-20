@@ -7,7 +7,7 @@ import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequiredArgsConstructor
-@RequestMapping("/api/videos/commands")
+@RequestMapping("/videos/commands")
 public class SaveClipCommandController {
 
     private final DeviceControlService deviceControlService;
