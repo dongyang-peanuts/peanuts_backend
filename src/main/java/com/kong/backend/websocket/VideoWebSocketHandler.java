@@ -99,15 +99,12 @@ public class VideoWebSocketHandler extends TextWebSocketHandler {
             JsonNode json = mapper.readTree(payload);
 
             String eventType      = getTextOrNull(json, "eventType");
-            Boolean fall          = getBooleanOrNull(json, "fall");
             Double layRate        = getDoubleOrNull(json, "layRate");
-            String wanderState    = getTextOrNull(json, "wanderState");   // NORMAL / WANDERING
-            Double wanderProb     = getDoubleOrNull(json, "wanderProb");  // 0.0 ~ 1.0
-            String wanderPosture  = getTextOrNull(json, "wanderPosture"); // LYING / STANDING ...
+            Double prob           = getDoubleOrNull(json, "prob");
             Double ts             = getDoubleOrNull(json, "ts");
 
             // 필수값 검증
-            if (eventType == null || fall == null || layRate == null || ts == null) {
+            if (eventType == null || layRate == null || ts == null) {
                 System.out.println("❌ 필수 필드 누락: " + payload);
                 return;
             }
@@ -116,27 +113,23 @@ public class VideoWebSocketHandler extends TextWebSocketHandler {
             LocalDateTime detectedAt = tsToLocalDateTime(ts, KST);
             int userKey = resolveUserKey(json);
 
-            String alertLevel = classifyAlertLevel(eventType, layRate, fall, wanderState, wanderProb);
-
             // pose 자리에 wanderPosture 매핑(시그니처 유지)
             alertService.saveAlert(
-                    alertLevel,
                     eventType,
                     detectedAt,
                     userKey,
-                    /* pose */ wanderPosture,
                     layRate,
-                    fall,
+                    prob,
                     ts,
                     null
             );
 
             // 2) 클라이언트(관리자 알림 + 디바이스) 모두에 항상 브로드캐스트
-            String enriched = enrichPayloadForClients(json, alertLevel, detectedAt, userKey);
+            String enriched = enrichPayloadForClients(json, detectedAt, userKey, eventType);
             broadcastTo(alertSessions, new TextMessage(enriched));                // 관리자
             deviceControlService.broadcastToDevices(new TextMessage(enriched));   // 디바이스
 
-            System.out.println("✅ 저장/전송 완료 [" + alertLevel + "] " + eventType +
+            System.out.println("✅ 저장/전송 완료 " + eventType +
                     " @ " + detectedAt.format(TS_FMT));
 
         } catch (Exception e) {
@@ -146,11 +139,9 @@ public class VideoWebSocketHandler extends TextWebSocketHandler {
 
     /** 클라이언트로 보낼 페이로드에 부가 정보 추가 */
     private String enrichPayloadForClients(JsonNode original,
-                                           String alertLevel,
                                            LocalDateTime detectedAt,
-                                           int userKey) {
+                                           int userKey, String eventType) {
         ObjectNode node = original.deepCopy();
-        node.put("alertLevel", alertLevel);
         node.put("detectedAtIso", detectedAt.format(TS_FMT));
         node.put("userKey", userKey);
         return node.toString();
@@ -202,23 +193,6 @@ public class VideoWebSocketHandler extends TextWebSocketHandler {
         long seconds = (long) epochSeconds;
         long nanos = (long) ((epochSeconds - seconds) * 1_000_000_000L);
         return Instant.ofEpochSecond(seconds, nanos).atZone(zoneId).toLocalDateTime();
-    }
-
-    /** 낙상/배회 혼합 스키마 대응 알림 레벨 분류 (레벨 산정만 유지) */
-    private String classifyAlertLevel(String eventType,
-                                      double layRate,
-                                      boolean fall,
-                                      String wanderState,
-                                      Double wanderProb) {
-        if ("낙상 해제".equals(eventType)) return "RECOVERY";
-        if (fall) return "HIGH";
-        boolean wanderingHigh =
-                "WANDERING".equalsIgnoreCase(String.valueOf(wanderState)) &&
-                        wanderProb != null && wanderProb >= 0.80;
-        if (wanderingHigh) return "MEDIUM";
-        if (layRate > 0.6) return "MEDIUM";
-        if (layRate > 0.3) return "LOW";
-        return "INFO";
     }
 
     /** 실제 서비스에선 JWT/HandshakeInterceptor로 userKey를 세션에 넣고 꺼내세요. */

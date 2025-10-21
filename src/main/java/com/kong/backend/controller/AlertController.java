@@ -71,7 +71,7 @@ public class AlertController {
             Files.write(filePath, file.getBytes());
 
             // 2. 알림 저장
-            alertService.saveAlert(alertLevel, eventType, LocalDateTime.parse(detectedAt), userKey, fileName);
+            alertService.saveAlert(eventType, LocalDateTime.parse(detectedAt), userKey,null,null,fileName);
 
             return ResponseEntity.ok("알림 및 영상 저장 완료");
         } catch (Exception e) {

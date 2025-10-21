@@ -206,7 +206,6 @@ public class UserService {
         AlertHistoryEntity alert = new AlertHistoryEntity();
         alert.setUser(user);
         alert.setEventType(eventType);
-        alert.setAlertLevel(level);
         alert.setDetectedAt(LocalDateTime.now());
 
         alertHistoryRepository.save(alert);

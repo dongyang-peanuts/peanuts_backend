@@ -35,13 +35,11 @@ public class AlertService {
             AlertHistoryDto dto = new AlertHistoryDto();
             dto.setAlertId(entity.getAlertId());
             dto.setEventType(entity.getEventType());
-            dto.setAlertLevel(entity.getAlertLevel());
             dto.setDetectedAt(entity.getDetectedAt());
 
             // DTO가 확장되어 있다면 아래도 매핑하세요.
-            dto.setPose(entity.getPose());
             dto.setLayRate(entity.getLayRate());
-            dto.setFall(entity.getFall());
+            dto.setProb(entity.getProb());
             dto.setTs(entity.getTs());
 
             return dto;
@@ -57,13 +55,11 @@ public class AlertService {
             AlertHistoryDto dto = new AlertHistoryDto();
             dto.setAlertId(entity.getAlertId());
             dto.setEventType(entity.getEventType());
-            dto.setAlertLevel(entity.getAlertLevel());
             dto.setDetectedAt(entity.getDetectedAt());
 
             // DTO 확장 시 매핑
-            dto.setPose(entity.getPose());
             dto.setLayRate(entity.getLayRate());
-            dto.setFall(entity.getFall());
+            dto.setProb(entity.getProb());
             dto.setTs(entity.getTs());
 
             return dto;
@@ -82,7 +78,6 @@ public class AlertService {
             AlertHistoryEntity alert = new AlertHistoryEntity();
             alert.setUser(user);
             alert.setEventType(dto.getEventType());
-            alert.setAlertLevel(dto.getAlertLevel());
             alert.setDetectedAt(LocalDateTime.now());
 
             alertHistoryRepository.save(alert);
@@ -93,13 +88,12 @@ public class AlertService {
      * 새 스키마 대응 저장 (권장 사용)
      * ------------------------------ */
     @Transactional
-    public void saveAlert(String alertLevel,
+    public void saveAlert(
                           String eventType,
                           LocalDateTime detectedAt,
                           int userKey,
-                          String pose,            // stand | sit | lay | unknown
                           Double layRate,         // 0.0 ~ 1.0 (nullable)
-                          Boolean fall,           // true | false (nullable)
+                          Double prob,         // 0.0 ~ 1.0 (nullable)
                           Double ts,              // epoch seconds (nullable)
                           String videoPath) {
 
@@ -109,19 +103,17 @@ public class AlertService {
 
             AlertHistoryEntity alert = new AlertHistoryEntity();
             alert.setUser(user);
-            alert.setAlertLevel(alertLevel);
             alert.setEventType(eventType);
             alert.setDetectedAt(detectedAt);
             alert.setVideoPath(videoPath);
 
             // --- 추가 필드 ---
-            alert.setPose(pose);
             alert.setLayRate(normalizeLayRate(layRate));
-            alert.setFall(fall);
+            alert.setProb(prob);
             alert.setTs(ts);
 
             alertHistoryRepository.save(alert);
-            System.out.println("✅ 알림 저장 완료(확장): " + alertLevel + ", " + eventType + " @ " + detectedAt);
+            System.out.println("✅ 알림 저장 완료(확장): " + eventType + " @ " + detectedAt);
         } catch (Exception e) {
             System.out.println("❌ 알림 저장 실패(확장): " + e.getMessage());
             e.printStackTrace();
@@ -134,14 +126,16 @@ public class AlertService {
      *  - 가능한 빨리 위의 확장 시그니처로 전환하세요.
      * ------------------------------ */
     @Transactional
-    public void saveAlert(String alertLevel,
+    public void saveAlert(
                           String eventType,
                           LocalDateTime detectedAt,
                           int userKey,
+                          Double layRate,
+                          Double prob,
                           String videoPath) {
         // 확장 메서드로 위임 (추가값은 null)
-        saveAlert(alertLevel, eventType, detectedAt, userKey,
-                null, null, null, null, videoPath);
+        saveAlert(eventType, detectedAt, userKey,
+                layRate, prob, null, videoPath);
     }
 
     /* ------------------------------
