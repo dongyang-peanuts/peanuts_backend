@@ -113,7 +113,7 @@ public class VideoWebSocketHandler extends TextWebSocketHandler {
             Double layRate   = getDoubleOrNull(json, "layRate");
             Double prob      = getDoubleOrNull(json, "prob");
             Double ts        = getDoubleOrNull(json, "ts");
-            Long videoId     = getLongOrNull(json, "videoId"); // 선택: 있으면 FK 연결
+            Integer videoId     = getIntegerOrNull(json, "videoId"); // 선택: 있으면 FK 연결
 
             // 필수값 검증
             if (eventType == null || ts == null) {
@@ -156,7 +156,7 @@ public class VideoWebSocketHandler extends TextWebSocketHandler {
                                            int userKey,
                                            String eventType,
                                            Integer alertId,   // 저장된 alertId
-                                           Long videoId) {
+                                           Integer videoId) {
         ObjectNode node = original.deepCopy();
         node.put("detectedAtIso", detectedAt.format(TS_FMT));
         node.put("userKey", userKey);
@@ -213,6 +213,14 @@ public class VideoWebSocketHandler extends TextWebSocketHandler {
                 ? node.get(field).asLong()
                 : null;
     }
+
+    // 1) Integer용 파서 추가
+    private Integer getIntegerOrNull(JsonNode node, String field) {
+        return (node.hasNonNull(field) && node.get(field).canConvertToInt())
+                ? node.get(field).asInt()
+                : null;
+    }
+
 
     private LocalDateTime tsToLocalDateTime(double epochSeconds, ZoneId zoneId) {
         long seconds = (long) epochSeconds;

@@ -196,6 +196,6 @@ public class AlertService {
         private Double layRate;            // nullable
         private Double prob;               // nullable
         private Double ts;                 // nullable (epoch seconds, float)
-        private Long videoId;              // nullable (VideoEntity FK)
+        private Integer videoId;              // nullable (VideoEntity FK)
     }
 }

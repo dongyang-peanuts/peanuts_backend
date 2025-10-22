@@ -36,6 +36,8 @@ app:
   storage:
     local:
       base-dir: /home/ubuntu/app/videos
+  media:
+    public-base-url: http://kongback.kro.kr/media
 
 server:
   port: 8080
