@@ -47,37 +47,4 @@ public class AlertController {
         alertService.saveMultipleTestAlerts(alertList);
         return ResponseEntity.ok("테스트 알림 여러 개 저장 완료");
     }
-
-    @Operation(summary = "낙상 알림 + 영상 파일 업로드", responses = {
-            @ApiResponse(responseCode = "200", description = "알림 및 영상 저장 성공"),
-            @ApiResponse(responseCode = "400", description = "입력 오류")
-    })
-    @PostMapping("/upload")
-    public ResponseEntity<String> uploadFallAlertWithVideo(
-            @RequestParam("userKey") Integer userKey,
-            @RequestParam("alertLevel") String alertLevel,
-            @RequestParam("eventType") String eventType,
-            @RequestParam("detectedAt") String detectedAt,
-            @RequestParam("file") MultipartFile file
-    ) {
-        try {
-            // 1. 영상 저장
-            String saveDir = "uploads/videos/";
-            File dir = new File(saveDir);
-            if (!dir.exists()) dir.mkdirs();
-
-            String fileName = UUID.randomUUID() + "_" + file.getOriginalFilename();
-            Path filePath = Paths.get(saveDir, fileName);
-            Files.write(filePath, file.getBytes());
-
-            // 2. 알림 저장
-            alertService.saveAlert(eventType, LocalDateTime.parse(detectedAt), userKey,null,null,fileName);
-
-            return ResponseEntity.ok("알림 및 영상 저장 완료");
-        } catch (Exception e) {
-            return ResponseEntity.status(500).body("에러 발생: " + e.getMessage());
-        }
-    }
-
-
 }

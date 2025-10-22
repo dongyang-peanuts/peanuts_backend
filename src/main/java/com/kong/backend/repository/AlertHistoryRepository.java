@@ -1,6 +1,7 @@
 package com.kong.backend.repository;
 
 import com.kong.backend.Entity.AlertHistoryEntity;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
@@ -34,4 +35,7 @@ public interface AlertHistoryRepository extends JpaRepository<AlertHistoryEntity
     List<AlertHistoryEntity> findByUser_UserKeyAndProbGreaterThanEqualOrderByDetectedAtDesc(
             Integer userKey, Double prob
     );
+
+    Page<AlertHistoryEntity> findByUser_UserKey(Integer userKey, Pageable pageable);
+
 }

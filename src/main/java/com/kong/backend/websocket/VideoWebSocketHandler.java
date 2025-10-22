@@ -4,8 +4,10 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.kong.backend.service.AlertService;
+import com.kong.backend.service.AlertService.SaveAlertCommand;
 import com.kong.backend.service.DeviceControlService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.springframework.web.socket.*;
 import org.springframework.web.socket.handler.TextWebSocketHandler;
@@ -15,6 +17,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
+@Slf4j
 @Component
 @RequiredArgsConstructor
 public class VideoWebSocketHandler extends TextWebSocketHandler {
@@ -22,11 +25,11 @@ public class VideoWebSocketHandler extends TextWebSocketHandler {
     private final AlertService alertService;
     private final ObjectMapper mapper = new ObjectMapper();
 
-    // 세션 보관 (브라우저 쪽만 유지)
-    private final Set<WebSocketSession> videoSessions  = ConcurrentHashMap.newKeySet(); // 사용자/관리자 영상 미러링
+    // 세션 보관 (브라우저/관리자)
+    private final Set<WebSocketSession> videoSessions  = ConcurrentHashMap.newKeySet(); // 영상 미러링
     private final Set<WebSocketSession> alertSessions  = ConcurrentHashMap.newKeySet(); // 관리자 알림 구독
 
-    // ✅ 디바이스 세션은 서비스로 위임 (REST로도 제어 가능하게)
+    // 디바이스 제어/브로드캐스트
     private final DeviceControlService deviceControlService;
 
     private static final ZoneId KST = ZoneId.of("Asia/Seoul");
@@ -36,17 +39,21 @@ public class VideoWebSocketHandler extends TextWebSocketHandler {
     @Override
     public void afterConnectionEstablished(WebSocketSession session) {
         String path = session.getUri() != null ? session.getUri().getPath() : "";
-        if (path.contains("/ws/video") || path.contains("/ws/admin/monitor")) {
-            videoSessions.add(session);
-            System.out.println("✅ 영상 채널 연결됨: " + path);
-        } else if (path.contains("/ws/alert")) {
-            alertSessions.add(session);
-            System.out.println("✅ 알림 채널 연결됨: " + path);
-        } else if (path.contains("/ws/fall")) { // 라즈베리파이(파이썬) 낙상/배회 이벤트 푸시
-            deviceControlService.registerDevice(session);
-            System.out.println("✅ 디바이스 채널 연결됨: " + path);
-        } else {
-            System.out.println("ℹ️ 알 수 없는 경로로 연결: " + path);
+        try {
+            if (path.contains("/ws/video") || path.contains("/ws/admin/monitor")) {
+                videoSessions.add(session);
+                log.info("✅ 영상 채널 연결: {}", path);
+            } else if (path.contains("/ws/alert")) {
+                alertSessions.add(session);
+                log.info("✅ 알림 채널 연결: {}", path);
+            } else if (path.contains("/ws/fall")) { // 라즈베리파이(낙상/배회 이벤트)
+                deviceControlService.registerDevice(session);
+                log.info("✅ 디바이스 채널 연결: {}", path);
+            } else {
+                log.info("ℹ️ 알 수 없는 경로 연결: {}", path);
+            }
+        } catch (Exception e) {
+            log.error("❌ afterConnectionEstablished 처리 오류", e);
         }
     }
 
@@ -62,14 +69,14 @@ public class VideoWebSocketHandler extends TextWebSocketHandler {
             } else if (path.contains("/ws/alert")) {
                 // 일반적으로 수신 없음
             } else {
-                System.out.println("ℹ️ 처리되지 않은 경로 메시지: " + path);
+                log.debug("ℹ️ 처리되지 않은 경로 메시지: {}", path);
             }
         } catch (Exception e) {
-            System.out.println("❌ 메시지 처리 오류: " + e.getMessage());
+            log.error("❌ 텍스트 메시지 처리 오류", e);
         }
     }
 
-    /** 이진(영상) 메시지도 미러링이 필요하면 지원 */
+    /** 바이너리(영상) 메시지 처리 (필요 시) */
     @Override
     protected void handleBinaryMessage(WebSocketSession session, BinaryMessage message) {
         String path = session.getUri() != null ? session.getUri().getPath() : "";
@@ -78,72 +85,84 @@ public class VideoWebSocketHandler extends TextWebSocketHandler {
                 broadcastBinaryTo(videoSessions, message);
             }
         } catch (Exception e) {
-            System.out.println("❌ 바이너리 메시지 처리 오류: " + e.getMessage());
+            log.error("❌ 바이너리 메시지 처리 오류", e);
         }
     }
 
     /** 세션 종료 처리 */
     @Override
     public void afterConnectionClosed(WebSocketSession session, CloseStatus status) {
-        videoSessions.remove(session);
-        alertSessions.remove(session);
-        deviceControlService.unregisterDevice(session);
+        try {
+            videoSessions.remove(session);
+            alertSessions.remove(session);
+            deviceControlService.unregisterDevice(session);
+        } catch (Exception e) {
+            log.warn("세션 종료 처리 중 예외", e);
+        }
     }
 
     // ===================== 디바이스 이벤트 처리 =====================
 
     /** 라즈베리파이가 보내는 새 스키마(JSON) 처리 */
     private void onDeviceEvent(String payload) {
-        System.out.println("📥 디바이스 이벤트 수신: " + payload);
+        log.debug("📥 디바이스 이벤트 수신: {}", payload);
         try {
             JsonNode json = mapper.readTree(payload);
 
-            String eventType      = getTextOrNull(json, "eventType");
-            Double layRate        = getDoubleOrNull(json, "layRate");
-            Double prob           = getDoubleOrNull(json, "prob");
-            Double ts             = getDoubleOrNull(json, "ts");
+            String eventType = getTextOrNull(json, "eventType");
+            Double layRate   = getDoubleOrNull(json, "layRate");
+            Double prob      = getDoubleOrNull(json, "prob");
+            Double ts        = getDoubleOrNull(json, "ts");
+            Long videoId     = getLongOrNull(json, "videoId"); // 선택: 있으면 FK 연결
 
             // 필수값 검증
-            if (eventType == null || layRate == null || ts == null) {
-                System.out.println("❌ 필수 필드 누락: " + payload);
+            if (eventType == null || ts == null) {
+                log.warn("❌ 필수 필드 누락(eventType/ts): {}", payload);
                 return;
             }
 
-            // 1) 항상 저장
+            // 1) 저장 (detectedAt: ts 또는 서버시간)
             LocalDateTime detectedAt = tsToLocalDateTime(ts, KST);
             int userKey = resolveUserKey(json);
 
-            // pose 자리에 wanderPosture 매핑(시그니처 유지)
-            alertService.saveAlert(
-                    eventType,
-                    detectedAt,
-                    userKey,
-                    layRate,
-                    prob,
-                    ts,
-                    null
+            var savedDto = alertService.saveAlert(
+                    SaveAlertCommand.builder()
+                            .eventType(eventType)
+                            .detectedAt(detectedAt)
+                            .userKey(userKey)
+                            .layRate(layRate)
+                            .prob(prob)
+                            .ts(ts)
+                            .videoId(videoId)   // 있으면 비디오 FK 연결
+                            .build()
             );
 
-            // 2) 클라이언트(관리자 알림 + 디바이스) 모두에 항상 브로드캐스트
-            String enriched = enrichPayloadForClients(json, detectedAt, userKey, eventType);
-            broadcastTo(alertSessions, new TextMessage(enriched));                // 관리자
-            deviceControlService.broadcastToDevices(new TextMessage(enriched));   // 디바이스
+            // 2) 브로드캐스트(관리자/디바이스)
+            String enriched = enrichPayloadForClients(json, detectedAt, userKey, eventType, savedDto.getAlertId(), videoId);
+            broadcastTo(alertSessions, new TextMessage(enriched));               // 관리자
+            deviceControlService.broadcastToDevices(new TextMessage(enriched));  // 디바이스
 
-            System.out.println("✅ 저장/전송 완료 " + eventType +
-                    " @ " + detectedAt.format(TS_FMT));
+            log.info("✅ 저장/전송 완료: type={}, userKey={}, detectedAt={}, videoId={}",
+                    eventType, userKey, detectedAt.format(TS_FMT), videoId);
 
         } catch (Exception e) {
-            System.out.println("❌ 디바이스 이벤트 파싱 실패: " + e.getMessage());
+            log.error("❌ 디바이스 이벤트 파싱/처리 실패", e);
         }
     }
 
     /** 클라이언트로 보낼 페이로드에 부가 정보 추가 */
     private String enrichPayloadForClients(JsonNode original,
                                            LocalDateTime detectedAt,
-                                           int userKey, String eventType) {
+                                           int userKey,
+                                           String eventType,
+                                           Integer alertId,   // 저장된 alertId
+                                           Long videoId) {
         ObjectNode node = original.deepCopy();
         node.put("detectedAtIso", detectedAt.format(TS_FMT));
         node.put("userKey", userKey);
+        node.put("eventType", eventType);
+        if (alertId != null) node.put("alertId", alertId);
+        if (videoId != null) node.put("videoId", videoId);
         return node.toString();
     }
 
@@ -154,7 +173,7 @@ public class VideoWebSocketHandler extends TextWebSocketHandler {
             try {
                 if (s.isOpen()) s.sendMessage(message);
             } catch (Exception e) {
-                System.out.println("❌ 클라이언트 전송 실패: " + e.getMessage());
+                log.warn("❌ 텍스트 전송 실패: {}", s.getId(), e);
             }
         }
     }
@@ -164,7 +183,7 @@ public class VideoWebSocketHandler extends TextWebSocketHandler {
             try {
                 if (s.isOpen()) s.sendMessage(message);
             } catch (Exception e) {
-                System.out.println("❌ 바이너리 전송 실패: " + e.getMessage());
+                log.warn("❌ 바이너리 전송 실패: {}", s.getId(), e);
             }
         }
     }
@@ -186,6 +205,12 @@ public class VideoWebSocketHandler extends TextWebSocketHandler {
     private Boolean getBooleanOrNull(JsonNode node, String field) {
         return (node.hasNonNull(field) && node.get(field).isBoolean())
                 ? node.get(field).asBoolean()
+                : null;
+    }
+
+    private Long getLongOrNull(JsonNode node, String field) {
+        return (node.hasNonNull(field) && node.get(field).canConvertToLong())
+                ? node.get(field).asLong()
                 : null;
     }
 
