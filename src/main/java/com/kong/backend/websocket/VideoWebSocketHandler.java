@@ -30,7 +30,7 @@ public class VideoWebSocketHandler extends TextWebSocketHandler {
     // WebSocket 세션 그룹
     private final Set<WebSocketSession> videoSessions  = ConcurrentHashMap.newKeySet(); // 영상 미러링
     private final Set<WebSocketSession> alertSessions  = ConcurrentHashMap.newKeySet(); // 관리자 알림
-    private static final int MAX_ALERT_SESSIONS = 20; // 세션 최대 제한
+    private static final int MAX_ALERT_SESSIONS = 5; // 세션 최대 제한
 
     private static final ZoneId KST = ZoneId.of("Asia/Seoul");
     private static final DateTimeFormatter TS_FMT = DateTimeFormatter.ISO_LOCAL_DATE_TIME;

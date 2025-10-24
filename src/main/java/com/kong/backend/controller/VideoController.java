@@ -17,7 +17,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.nio.file.Path;
 
-@Tag(name = "동영상 API", description = "동영상 북마크")
+@Tag(name = "동영상 API", description = "동영상 업로드 / 삭제 / URL")
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/videos")
@@ -72,10 +72,30 @@ public class VideoController {
             String filePath
     ) {}
 
+    @Operation(
+            summary = "동영상 삭제",
+            description = "EC2 로컬에 저장되어있는 동영상과, DB 데이터 삭제"
+    )
+    @ApiResponse(responseCode = "204", description = "삭제 성공")
+    @ApiResponse(responseCode = "403", description = "권한 없음")
+    @ApiResponse(responseCode = "404", description = "비디오 없음")
+    @DeleteMapping("/{videoId}")
+    public ResponseEntity<Void> deleteVideo(
+            @PathVariable
+            @Schema(description = "삭제할 비디오 ID", example = "42")
+            Integer videoId,
+            @RequestParam
+            @Schema(description = "유저키", example = "1")
+            Integer userKey
+    ) throws Exception {
+        videoService.deleteVideo(videoId, userKey);
+        return ResponseEntity.noContent().build(); // 204
+    }
+
     // ✅ Nginx가 서빙하는 재생 URL 발급
     @Operation(
             summary = "동영상 스트리밍 URL",
-            description = "Nginx에서 스트리밍하는 동영상의 URL을 반환합니다. "
+            description = "Nginx에서 스트리밍하는 동영상의 URL을 반환 "
     )
     @ApiResponse(
             responseCode = "200",
