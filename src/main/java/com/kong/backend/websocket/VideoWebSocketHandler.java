@@ -74,6 +74,7 @@ public class VideoWebSocketHandler extends TextWebSocketHandler {
         try {
             if (path.contains("/ws/fall")) {
                 onDeviceEvent(message.getPayload());
+                broadcastSafe(alertSessions, message);
             } else if (path.contains("/ws/video") || path.contains("/ws/admin/monitor")) {
                 broadcastSafe(videoSessions, message);
             }
